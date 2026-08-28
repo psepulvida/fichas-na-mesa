@@ -382,6 +382,7 @@
   .toast.show{opacity:1;}
   @media (prefers-reduced-motion:reduce){*{transition:none !important;}}
   .hidden{display:none !important;}
+  .share-actions{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px;}
 </style>
 
 <div class="wrap">
@@ -430,7 +431,10 @@
     <div class="section-head"><span class="eyebrow">Quem paga quem</span></div>
     <div class="card" id="cardAcertos"></div>
 
-    <button class="btn wide ghost" id="btnCopiar" style="margin-top:12px">Copiar resumo para o WhatsApp</button>
+    <div class="share-actions">
+      <button class="btn ghost" id="btnCopiar">Copiar resumo</button>
+      <button class="btn ghost" id="btnWhatsApp">Compartilhar no WhatsApp</button>
+    </div>
   </section>
 
   <details id="detHistorico">
@@ -461,6 +465,10 @@
     <label class="field">
       <span class="eyebrow">Nome</span>
       <input type="text" id="inNome" autocomplete="off" enterkeyhint="done" maxlength="18">
+    </label>
+    <label class="field">
+      <span class="eyebrow">Chave PIX</span>
+      <input type="text" id="inPix" autocomplete="off" maxlength="100">
     </label>
     <label class="field">
       <span class="eyebrow">Buy-in inicial</span>
@@ -986,6 +994,7 @@
   function abrirNovoJogador(){
     origemEntrada = null;
     $("inNome").value = "";
+    $("inPix").value = "";
     $("inValorEntrada").value = String(S.buyin).replace(".",",");
     $("errJogador").textContent = "";
     botoesRapidos($("quickEntrada"), $("inValorEntrada"));
@@ -995,6 +1004,7 @@
   }
   $("okJogador").addEventListener("click", function(){
     var nome = $("inNome").value.trim();
+    var pix = $("inPix").value.trim();
     var valor = parseMoney($("inValorEntrada").value);
     var err = $("errJogador");
     if(!nome){ err.textContent = "Escreva o nome do jogador."; return; }
@@ -1002,7 +1012,7 @@
     if(origemEntrada !== null && !jogador(origemEntrada)){ err.textContent = "Escolha de onde vêm as fichas."; return; }
 
     var id = novoId();
-    S.jogadores.push({ id:id, nome:nome, cor: CORES[(S.jogadores.length) % CORES.length], fora:false });
+    S.jogadores.push({ id:id, nome:nome, pix:pix, cor: CORES[(S.jogadores.length) % CORES.length], fora:false });
     S.eventos.push({ id: "e"+(S.seq++), de: origemEntrada, para: id, valor: valor });
     fecharDialogo($("dlgJogador"));
     render();
@@ -1175,7 +1185,11 @@
     L.push("");
     L.push("ACERTO DAS CONTAS");
     if(!pg.length){ L.push("• Ninguém deve nada a ninguém."); }
-    pg.forEach(function(p){ L.push("• " + nomeDe(p.de) + " paga " + R(p.valor) + " para " + nomeDe(p.para)); });
+    pg.forEach(function(p){
+      var recebedor = jogador(p.para);
+      var pix = recebedor && recebedor.pix ? " (PIX: " + recebedor.pix + ")" : "";
+      L.push("• " + nomeDe(p.de) + " paga " + R(p.valor) + " para " + nomeDe(p.para) + pix);
+    });
     var dif = arredonda(somaFichasContadas() - c.totalMesa);
     if(Math.abs(dif) >= 0.005){
       L.push("");
@@ -1220,6 +1234,9 @@
 
   $("btnCopiar").addEventListener("click", function(){
     copiar(resumoTexto(), "Resumo copiado");
+  });
+  $("btnWhatsApp").addEventListener("click", function(){
+    window.open("https://wa.me/?text=" + encodeURIComponent(resumoTexto()), "_blank");
   });
 
   $("btnNova").addEventListener("click", function(){
