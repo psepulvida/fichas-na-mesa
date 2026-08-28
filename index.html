@@ -1,0 +1,1332 @@
+<meta charset="utf-8">
+<title>Fichas na Mesa</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=Fraunces:opsz,wght@9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+  :root{
+    color-scheme: dark;
+    --ground:#101A19;
+    --surface:#16221F;
+    --surface-2:#1D2C28;
+    --line:#25352F;
+    --line-soft:#1F2E2A;
+    --text:#EAF0EC;
+    --muted:#8FA39C;
+    --faint:#63776F;
+    --brass:#D6A94E;
+    --brass-dim:#8A6E2F;
+    --up:#4FBE8B;
+    --down:#E5645C;
+    --radius:14px;
+    --fs-micro:11px;
+    --fs-small:13px;
+    --fs-base:15px;
+    --fs-lead:17px;
+    --fs-title:22px;
+    --fs-display:34px;
+    --pad:16px;
+    --maxw:560px;
+  }
+
+  *{box-sizing:border-box;}
+
+  body{
+    margin:0;
+    background:
+      radial-gradient(120% 65% at 50% 0%, #16241F 0%, rgba(16,26,25,0) 70%),
+      var(--ground);
+    color:var(--text);
+    font-family:"Archivo", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size:var(--fs-base);
+    line-height:1.45;
+    -webkit-text-size-adjust:100%;
+    padding-bottom:156px;
+  }
+
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:0 var(--pad);}
+
+  /* ---------- tipografia utilitária ---------- */
+  .eyebrow{
+    font-size:var(--fs-micro);
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--faint);
+    font-weight:600;
+  }
+  .money{
+    font-family:"IBM Plex Mono", ui-monospace, monospace;
+    font-variant-numeric:tabular-nums;
+    font-feature-settings:"tnum" 1;
+  }
+  .up{color:var(--up);}
+  .down{color:var(--down);}
+  .zero{color:var(--muted);}
+
+  /* ---------- cabeçalho ---------- */
+  header{
+    padding:22px 0 14px;
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:12px;
+  }
+  h1{
+    font-family:"Fraunces", Georgia, serif;
+    font-size:var(--fs-title);
+    font-weight:700;
+    margin:2px 0 0;
+    line-height:1.1;
+    letter-spacing:-.01em;
+  }
+  .sub{font-size:var(--fs-small); color:var(--muted); margin-top:3px;}
+
+  .buyin-set{
+    display:flex; flex-direction:column; align-items:flex-end; gap:4px;
+    flex:0 0 auto;
+  }
+
+
+  /* ---------- painel da mesa ---------- */
+  .table-panel{
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    background:linear-gradient(180deg, var(--surface-2), var(--surface));
+    padding:18px var(--pad) 16px;
+    position:relative;
+    overflow:hidden;
+  }
+  .table-panel::before{
+    content:"";
+    position:absolute; inset:0;
+    background:radial-gradient(80% 120% at 50% -20%, rgba(214,169,78,.10), transparent 60%);
+    pointer-events:none;
+  }
+  .table-total{
+    font-family:"Fraunces", Georgia, serif;
+    font-size:var(--fs-display);
+    font-weight:700;
+    line-height:1;
+    margin-top:6px;
+    letter-spacing:-.02em;
+  }
+  .table-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    margin-top:16px;
+    padding-top:14px;
+    border-top:1px solid var(--line-soft);
+  }
+  .table-grid div span{display:block;}
+  .stat-v{font-size:var(--fs-lead); font-weight:600; margin-top:2px;}
+
+  /* ---------- lista de jogadores ---------- */
+  .section-head{
+    display:flex; align-items:baseline; justify-content:space-between;
+    margin:28px 0 10px;
+  }
+  .players{display:flex; flex-direction:column; gap:8px;}
+
+  .player{
+    display:grid;
+    grid-template-columns:auto 1fr auto;
+    align-items:center;
+    gap:12px;
+    background:var(--surface);
+    border:1px solid var(--line-soft);
+    border-radius:var(--radius);
+    padding:12px 12px 12px 14px;
+  }
+  .player.out{opacity:.55;}
+
+  .chip{
+    width:30px; height:30px; border-radius:50%;
+    flex:0 0 auto;
+    background:
+      radial-gradient(circle at 50% 50%, var(--c, #4A7BE0) 0 56%, transparent 57%),
+      repeating-conic-gradient(from 15deg, rgba(255,255,255,.9) 0deg 20deg, transparent 20deg 60deg),
+      var(--c, #4A7BE0);
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.35);
+  }
+  .chip.sm{width:18px; height:18px;}
+  .chip.stock{
+    --c:#4B5A55;
+    background:
+      radial-gradient(circle at 50% 50%, #4B5A55 0 56%, transparent 57%),
+      repeating-conic-gradient(from 15deg, rgba(255,255,255,.45) 0deg 20deg, transparent 20deg 60deg),
+      #4B5A55;
+  }
+
+  .p-name{font-weight:600; line-height:1.2;}
+  .p-line{font-size:var(--fs-small); color:var(--muted); margin-top:2px;}
+  .p-line .money{font-size:.93em;}
+  .p-line b{color:var(--text); font-weight:500;}
+  .p-actions{display:flex; gap:6px;}
+
+  .tag{
+    display:inline-block;
+    font-size:var(--fs-micro);
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    font-weight:600;
+    color:var(--brass);
+    border:1px solid var(--brass-dim);
+    border-radius:99px;
+    padding:1px 7px;
+    margin-left:6px;
+    vertical-align:1px;
+  }
+
+  /* ---------- botões ---------- */
+  button{font-family:inherit;}
+  .btn{
+    appearance:none;
+    border:1px solid var(--line);
+    background:var(--surface-2);
+    color:var(--text);
+    border-radius:11px;
+    padding:11px 14px;
+    font-size:var(--fs-base);
+    font-weight:600;
+    min-height:44px;
+    cursor:pointer;
+  }
+  .btn:active{transform:translateY(1px);}
+  .btn.primary{background:var(--brass); border-color:var(--brass); color:#20180A;}
+  .btn.ghost{background:transparent;}
+  .btn.small{min-height:36px; padding:7px 11px; font-size:var(--fs-small); border-radius:9px;}
+  .btn.icon{min-height:36px; width:36px; padding:0; font-size:18px; line-height:1; color:var(--muted);}
+  .btn.wide{width:100%;}
+  .btn:disabled{opacity:.4; cursor:default;}
+  .btn:focus-visible, input:focus-visible, .pick:focus-visible{
+    outline:2px solid var(--brass); outline-offset:2px;
+  }
+
+  .actionbar{
+    position:fixed; left:0; right:0; bottom:0;
+    background:linear-gradient(180deg, rgba(16,26,25,0), var(--ground) 26%);
+    padding:20px var(--pad) calc(14px + env(safe-area-inset-bottom));
+    z-index:20;
+  }
+  .actionbar .inner{
+    max-width:var(--maxw); margin:0 auto;
+    display:grid; grid-template-columns:1fr 1fr; gap:8px;
+  }
+
+  /* ---------- inputs ---------- */
+  input[type="text"], input[type="tel"]{
+    appearance:none;
+    width:100%;
+    background:var(--ground);
+    border:1px solid var(--line);
+    border-radius:10px;
+    color:var(--text);
+    padding:11px 12px;
+    font-size:16px; /* evita zoom no iOS */
+    font-family:inherit;
+    min-height:44px;
+  }
+  input.money-in{
+    font-family:"IBM Plex Mono", ui-monospace, monospace;
+    font-variant-numeric:tabular-nums;
+  }
+  .buyin-set input[type="tel"]{width:104px; text-align:right; min-height:40px; padding:8px 10px;}
+  label.field{display:block; margin-bottom:14px;}
+  label.field > .eyebrow{display:block; margin-bottom:6px;}
+
+  /* seletor de jogador em fichas */
+  .picks{display:flex; flex-wrap:wrap; gap:7px;}
+  .pick{
+    display:inline-flex; align-items:center; gap:7px;
+    background:var(--ground);
+    border:1px solid var(--line);
+    color:var(--muted);
+    border-radius:99px;
+    padding:7px 13px 7px 9px;
+    font-size:var(--fs-small);
+    font-weight:600;
+    min-height:38px;
+    cursor:pointer;
+  }
+  .pick[aria-pressed="true"]{
+    border-color:var(--brass);
+    background:rgba(214,169,78,.10);
+    color:var(--text);
+  }
+  .quick{display:flex; gap:7px; margin-top:8px; flex-wrap:wrap;}
+
+  /* ---------- diálogos ---------- */
+  dialog{
+    border:none; padding:0; background:transparent;
+    max-width:var(--maxw); width:100%;
+    margin:auto auto 0;
+  }
+  dialog::backdrop{background:rgba(6,11,10,.72);}
+  .sheet{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-bottom:none;
+    border-radius:18px 18px 0 0;
+    padding:20px var(--pad) calc(20px + env(safe-area-inset-bottom));
+    max-height:88vh; overflow-y:auto;
+  }
+  .sheet h2{
+    font-family:"Fraunces", Georgia, serif;
+    font-size:var(--fs-lead); font-weight:600; margin:0 0 16px;
+  }
+  .sheet-actions{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:18px;}
+  .sheet-actions.uma{grid-template-columns:1fr;}
+  .menu-list{display:flex; flex-direction:column; gap:8px;}
+  .menu-list .btn{width:100%; text-align:left;}
+  .btn.perigo{background:var(--down); border-color:var(--down); color:#2B0D0B;}
+  .btn.item-perigo{color:var(--down); border-color:rgba(229,100,92,.35);}
+  textarea{
+    width:100%; min-height:104px; resize:vertical;
+    background:var(--ground); border:1px solid var(--line); border-radius:10px;
+    color:var(--text); padding:11px 12px;
+    font-family:"IBM Plex Mono", ui-monospace, monospace; font-size:13px; line-height:1.5;
+  }
+  textarea:focus-visible{outline:2px solid var(--brass); outline-offset:2px;}
+  .err{color:var(--down); font-size:var(--fs-small); min-height:20px; margin-top:8px;}
+
+  @media (min-width:600px){
+    dialog{margin:auto;}
+    .sheet{border-radius:18px; border-bottom:1px solid var(--line);}
+  }
+
+  /* ---------- fechamento ---------- */
+  .count-row{
+    display:grid; grid-template-columns:auto 1fr 118px;
+    align-items:center; gap:10px;
+    padding:9px 0;
+    border-bottom:1px solid var(--line-soft);
+  }
+  .count-row:last-child{border-bottom:none;}
+  .card{
+    background:var(--surface);
+    border:1px solid var(--line-soft);
+    border-radius:var(--radius);
+    padding:14px var(--pad);
+  }
+  .check{
+    margin-top:14px; padding:12px 14px;
+    border-radius:11px;
+    font-size:var(--fs-small);
+    border:1px solid var(--line);
+    background:var(--ground);
+  }
+  .check.ok{border-color:rgba(79,190,139,.45); color:var(--up);}
+  .check.bad{border-color:rgba(229,100,92,.45); color:var(--down);}
+
+  .result-row{
+    display:grid; grid-template-columns:auto 1fr auto;
+    align-items:center; gap:10px;
+    padding:11px 0; border-bottom:1px solid var(--line-soft);
+  }
+  .result-row:last-child{border-bottom:none;}
+  .result-v{font-size:var(--fs-lead); font-weight:600;}
+
+  .pay{
+    display:flex; align-items:center; gap:9px; flex-wrap:wrap;
+    padding:12px 0; border-bottom:1px solid var(--line-soft);
+    font-size:var(--fs-base);
+  }
+  .pay:last-child{border-bottom:none;}
+  .pay .arrow{color:var(--brass); font-weight:600;}
+  .pay .v{margin-left:auto; font-weight:600;}
+
+  /* ---------- histórico ---------- */
+  details{margin-top:12px;}
+  summary{
+    cursor:pointer; list-style:none;
+    font-size:var(--fs-small); color:var(--muted); font-weight:600;
+    padding:10px 0;
+  }
+  summary::-webkit-details-marker{display:none;}
+  summary::after{content:" ▾";}
+  details[open] summary::after{content:" ▴";}
+  .ev{
+    display:flex; align-items:center; gap:8px;
+    padding:9px 0; border-bottom:1px solid var(--line-soft);
+    font-size:var(--fs-small); color:var(--muted);
+  }
+  .ev:last-child{border-bottom:none;}
+  .ev .txt{flex:1;}
+  .ev .txt b{color:var(--text); font-weight:600;}
+
+  .aviso{
+    margin-top:12px;
+    border:1px solid var(--brass-dim);
+    background:rgba(214,169,78,.08);
+    color:var(--brass);
+    border-radius:11px;
+    padding:11px 14px;
+    font-size:var(--fs-small);
+  }
+  .empty{
+    color:var(--faint); font-size:var(--fs-small);
+    text-align:center; padding:26px 10px;
+    border:1px dashed var(--line); border-radius:var(--radius);
+  }
+  footer{margin:34px 0 10px; display:flex; gap:8px; flex-wrap:wrap;}
+  .toast{
+    position:fixed; left:50%; bottom:104px; transform:translateX(-50%);
+    background:var(--surface-2); border:1px solid var(--line);
+    color:var(--text); padding:10px 16px; border-radius:99px;
+    font-size:var(--fs-small); z-index:40; opacity:0; pointer-events:none;
+    transition:opacity .2s ease;
+  }
+  .toast.show{opacity:1;}
+  @media (prefers-reduced-motion:reduce){*{transition:none !important;}}
+  .hidden{display:none !important;}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <span class="eyebrow">Cash game</span>
+      <h1>Fichas na Mesa</h1>
+      <div class="sub" id="dataPartida">—</div>
+    </div>
+    <div class="buyin-set">
+      <span class="eyebrow">Buy-in padrão</span>
+      <input type="tel" inputmode="decimal" id="buyinPadrao" class="money-in" value="50" aria-label="Valor do buy-in padrão">
+    </div>
+  </header>
+
+  <div class="table-panel">
+    <span class="eyebrow">Fichas em jogo na mesa</span>
+    <div class="table-total money" id="totalMesa">R$ 0,00</div>
+    <div class="table-grid">
+      <div><span class="eyebrow">Ainda na mesa</span><span class="stat-v" id="statJogadores">0</span></div>
+      <div><span class="eyebrow">Compras de fichas</span><span class="stat-v" id="statCompras">0</span></div>
+    </div>
+  </div>
+
+  <div class="aviso hidden" id="avisoSalvar">
+    Este navegador não está guardando a partida sozinho. Antes de fechar a página, toque em <b>Backup</b> lá embaixo e guarde o código.
+  </div>
+
+  <div class="section-head">
+    <span class="eyebrow">Jogadores</span>
+    <span class="eyebrow" id="somaInvestido"></span>
+  </div>
+  <div class="players" id="listaJogadores"></div>
+
+  <section id="secFechamento" class="hidden">
+    <div class="section-head"><span class="eyebrow">Contagem final</span></div>
+    <div class="card">
+      <p class="sub" style="margin:0 0 6px">Digite quanto cada um tem em fichas na mesa agora, em reais.</p>
+      <div id="listaContagem"></div>
+      <div class="check" id="conferencia"></div>
+    </div>
+
+    <div class="section-head"><span class="eyebrow">Resultado da noite</span></div>
+    <div class="card" id="cardResultados"></div>
+
+    <div class="section-head"><span class="eyebrow">Quem paga quem</span></div>
+    <div class="card" id="cardAcertos"></div>
+
+    <button class="btn wide ghost" id="btnCopiar" style="margin-top:12px">Copiar resumo para o WhatsApp</button>
+  </section>
+
+  <details id="detHistorico">
+    <summary>Histórico de movimentações</summary>
+    <div id="listaEventos"></div>
+  </details>
+
+  <footer>
+    <button class="btn small ghost" id="btnBackup">Backup</button>
+    <button class="btn small ghost" id="btnRestaurar">Restaurar</button>
+    <button class="btn small ghost" id="btnNova" style="margin-left:auto">Nova partida</button>
+  </footer>
+</div>
+
+<div class="actionbar">
+  <div class="inner">
+    <button class="btn" id="btnNovoJogador">+ Jogador</button>
+    <button class="btn primary" id="btnComprar">Comprar fichas</button>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- diálogo: novo jogador -->
+<dialog id="dlgJogador">
+  <form method="dialog" class="sheet" id="formJogador">
+    <h2>Novo jogador</h2>
+    <label class="field">
+      <span class="eyebrow">Nome</span>
+      <input type="text" id="inNome" autocomplete="off" enterkeyhint="done" maxlength="18">
+    </label>
+    <label class="field">
+      <span class="eyebrow">Buy-in inicial</span>
+      <input type="tel" inputmode="decimal" id="inValorEntrada" class="money-in">
+      <span class="quick" id="quickEntrada"></span>
+    </label>
+    <div class="field">
+      <span class="eyebrow">As fichas vieram de</span>
+      <div class="picks" id="picksOrigemEntrada"></div>
+    </div>
+    <div class="err" id="errJogador"></div>
+    <div class="sheet-actions">
+      <button class="btn ghost cancelar" type="button">Cancelar</button>
+      <button class="btn primary" id="okJogador" type="button">Adicionar</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- diálogo: comprar fichas -->
+<dialog id="dlgCompra">
+  <form method="dialog" class="sheet" id="formCompra">
+    <h2>Comprar fichas</h2>
+    <div class="field">
+      <span class="eyebrow">Quem está comprando</span>
+      <div class="picks" id="picksComprador"></div>
+    </div>
+    <div class="field">
+      <span class="eyebrow">De quem vêm as fichas</span>
+      <div class="picks" id="picksVendedor"></div>
+    </div>
+    <label class="field">
+      <span class="eyebrow">Valor</span>
+      <input type="tel" inputmode="decimal" id="inValorCompra" class="money-in">
+      <span class="quick" id="quickCompra"></span>
+    </label>
+    <div class="err" id="errCompra"></div>
+    <div class="sheet-actions">
+      <button class="btn ghost cancelar" type="button">Cancelar</button>
+      <button class="btn primary" id="okCompra" type="button">Registrar</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- diálogo: sair do jogo -->
+<dialog id="dlgSaida">
+  <form method="dialog" class="sheet" id="formSaida">
+    <h2 id="tituloSaida">Sair do jogo</h2>
+    <label class="field">
+      <span class="eyebrow">Fichas que ele tem agora</span>
+      <input type="tel" inputmode="decimal" id="inValorSaida" class="money-in">
+    </label>
+    <div class="field">
+      <span class="eyebrow">Quem fica com essas fichas</span>
+      <div class="picks" id="picksDestinoSaida"></div>
+    </div>
+    <div class="err" id="errSaida"></div>
+    <div class="sheet-actions">
+      <button class="btn ghost cancelar" type="button">Cancelar</button>
+      <button class="btn primary" id="okSaida" type="button">Confirmar saída</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- diálogo: backup / restaurar -->
+<dialog id="dlgTexto">
+  <form method="dialog" class="sheet" id="formTexto">
+    <h2 id="tituloTexto">Backup</h2>
+    <p class="sub" id="ajudaTexto" style="margin-top:0"></p>
+    <label class="field">
+      <span class="eyebrow">Código da partida</span>
+      <textarea id="inTexto" autocomplete="off" spellcheck="false"></textarea>
+    </label>
+    <div class="err" id="errTexto"></div>
+    <div class="sheet-actions">
+      <button class="btn ghost cancelar" type="button">Fechar</button>
+      <button class="btn primary" id="okTexto" type="button">Copiar</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- diálogo: confirmação -->
+<dialog id="dlgConfirma">
+  <div class="sheet">
+    <h2 id="tituloConfirma">Confirmar</h2>
+    <p class="sub" id="msgConfirma" style="margin-top:0"></p>
+    <div class="sheet-actions">
+      <button class="btn ghost cancelar" type="button">Cancelar</button>
+      <button class="btn primary" id="okConfirma" type="button">Confirmar</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- diálogo: opções do jogador -->
+<dialog id="dlgMenu">
+  <div class="sheet">
+    <h2 id="tituloMenu">Jogador</h2>
+    <div class="menu-list" id="listaMenu"></div>
+    <div class="sheet-actions uma">
+      <button class="btn ghost cancelar" type="button">Fechar</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- diálogo: renomear -->
+<dialog id="dlgRenomear">
+  <form method="dialog" class="sheet" id="formRenomear">
+    <h2>Renomear jogador</h2>
+    <label class="field">
+      <span class="eyebrow">Nome</span>
+      <input type="text" id="inNovoNome" autocomplete="off" maxlength="18" enterkeyhint="done">
+    </label>
+    <div class="sheet-actions">
+      <button class="btn ghost cancelar" type="button">Cancelar</button>
+      <button class="btn primary" id="okRenomear" type="button">Salvar</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+(function(){
+  "use strict";
+
+  var CORES = ["#4A7BE0","#9B6BE0","#35A9BC","#DE6296","#9AA83F","#A87A52","#7E8FA3","#5C64D6"];
+  var CHAVE = "fichas-na-mesa-v1";
+
+  var S = null;
+
+  /* ---------------- persistência ---------------- */
+  function partidaNova(){
+    return { criada: new Date().toISOString(), buyin: 50, jogadores: [], eventos: [], fichas: {}, fechando: false, seq: 1 };
+  }
+  var podeSalvar = true;
+  function salvar(){
+    try{
+      localStorage.setItem(CHAVE, JSON.stringify(S));
+    }catch(e){
+      if(podeSalvar){
+        podeSalvar = false;
+        var a = document.getElementById("avisoSalvar");
+        if(a) a.classList.remove("hidden");
+      }
+    }
+  }
+  function carregar(){
+    try{
+      var raw = localStorage.getItem(CHAVE);
+      if(raw){
+        var o = JSON.parse(raw);
+        if(o && o.jogadores && o.eventos){ return o; }
+      }
+    }catch(e){}
+    return partidaNova();
+  }
+
+  /* ---------------- dinheiro ---------------- */
+  var fmtBRL = new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"});
+  function R(v){ return fmtBRL.format(arredonda(v)); }
+  function arredonda(v){ return Math.round((Number(v)||0)*100)/100; }
+  function parseMoney(txt){
+    if(txt === null || txt === undefined) return NaN;
+    var s = String(txt).trim().replace(/r\$/ig,"").replace(/\s/g,"");
+    if(!s) return NaN;
+    if(s.indexOf(",") > -1){ s = s.replace(/\./g,"").replace(",","."); }
+    var n = Number(s);
+    return isFinite(n) ? arredonda(n) : NaN;
+  }
+  function sinal(v){
+    v = arredonda(v);
+    if(v > 0) return "+" + R(v);
+    return R(v);
+  }
+  function classeValor(v){
+    v = arredonda(v);
+    return v > 0 ? "up" : (v < 0 ? "down" : "zero");
+  }
+
+  /* ---------------- cálculo ---------------- */
+  function jogador(id){
+    for(var i=0;i<S.jogadores.length;i++){ if(S.jogadores[i].id === id) return S.jogadores[i]; }
+    return null;
+  }
+  function nomeDe(id){
+    if(id === null || id === undefined) return "Estoque de fichas";
+    var j = jogador(id);
+    return j ? j.nome : "?";
+  }
+  function corDe(id){
+    if(id === null || id === undefined) return "#4B5A55";
+    var j = jogador(id);
+    return j ? j.cor : "#4B5A55";
+  }
+
+  // Regra única: cada evento move fichas de "de" para "para".
+  // Quem RECEBE fichas soma no que investiu. Quem ENTREGA fichas ganha crédito.
+  // "de/para = null" significa o estoque de fichas livres (fora do jogo).
+  function calcular(){
+    var m = {};
+    S.jogadores.forEach(function(j){ m[j.id] = {id:j.id, investido:0, credito:0}; });
+    S.eventos.forEach(function(ev){
+      if(ev.para !== null && m[ev.para]) m[ev.para].investido += ev.valor;
+      if(ev.de !== null && m[ev.de]) m[ev.de].credito += ev.valor;
+    });
+    var totalMesa = 0;
+    S.jogadores.forEach(function(j){
+      var x = m[j.id];
+      x.investido = arredonda(x.investido);
+      x.credito = arredonda(x.credito);
+      x.fichas = arredonda(S.fichas[j.id] || 0);
+      x.resultado = arredonda(x.fichas + x.credito - x.investido);
+      totalMesa += x.investido - x.credito;
+    });
+    return { p:m, totalMesa: arredonda(totalMesa) };
+  }
+
+  function somaFichasContadas(){
+    var t = 0;
+    S.jogadores.forEach(function(j){ t += Number(S.fichas[j.id]) || 0; });
+    return arredonda(t);
+  }
+
+  // Menor número de pagamentos: maior devedor paga o maior credor.
+  function acertos(lista){
+    var dev = [], rec = [], i, j;
+    lista.forEach(function(x){
+      if(x.resultado < -0.005) dev.push({id:x.id, v:-x.resultado});
+      else if(x.resultado > 0.005) rec.push({id:x.id, v:x.resultado});
+    });
+    dev.sort(function(a,b){ return b.v - a.v; });
+    rec.sort(function(a,b){ return b.v - a.v; });
+    var out = []; i = 0; j = 0;
+    while(i < dev.length && j < rec.length){
+      var v = arredonda(Math.min(dev[i].v, rec[j].v));
+      if(v > 0.005) out.push({de:dev[i].id, para:rec[j].id, valor:v});
+      dev[i].v = arredonda(dev[i].v - v);
+      rec[j].v = arredonda(rec[j].v - v);
+      if(dev[i].v <= 0.005) i++;
+      if(rec[j].v <= 0.005) j++;
+    }
+    return out;
+  }
+
+  /* ---------------- helpers de DOM ---------------- */
+  function $(id){ return document.getElementById(id); }
+  function el(tag, cls, txt){
+    var e = document.createElement(tag);
+    if(cls) e.className = cls;
+    if(txt !== undefined) e.textContent = txt;
+    return e;
+  }
+  function fichaEl(id, pequena){
+    var c = el("span","chip" + (pequena?" sm":"") + (id===null?" stock":""));
+    c.style.setProperty("--c", corDe(id));
+    return c;
+  }
+  var toastT = null;
+  function toast(msg){
+    var t = $("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toastT);
+    toastT = setTimeout(function(){ t.classList.remove("show"); }, 2200);
+  }
+
+  /* ---------------- seletor de fichas (picks) ---------------- */
+  // opcoes: [{id, nome}] — id null = estoque
+  function montarPicks(container, opcoes, selecionado, aoEscolher){
+    container.innerHTML = "";
+    opcoes.forEach(function(o){
+      var b = el("button","pick");
+      b.type = "button";
+      b.setAttribute("aria-pressed", String(o.id === selecionado));
+      b.appendChild(fichaEl(o.id, true));
+      b.appendChild(document.createTextNode(o.nome));
+      b.addEventListener("click", function(){ aoEscolher(o.id); });
+      container.appendChild(b);
+    });
+  }
+  function opcoesJogadores(incluirEstoque, excluirId, incluirForaDoJogo){
+    var arr = [];
+    if(incluirEstoque) arr.push({id:null, nome:"Estoque"});
+    S.jogadores.forEach(function(j){
+      if(j.id === excluirId) return;
+      if(j.fora && !incluirForaDoJogo) return;
+      arr.push({id:j.id, nome:j.nome});
+    });
+    return arr;
+  }
+  function botoesRapidos(container, input){
+    container.innerHTML = "";
+    var base = S.buyin || 50;
+    [base, base*2, base/2].forEach(function(v){
+      v = arredonda(v);
+      if(v <= 0) return;
+      var b = el("button","btn small ghost", R(v));
+      b.type = "button";
+      b.addEventListener("click", function(){ input.value = String(v).replace(".",","); });
+      container.appendChild(b);
+    });
+  }
+
+  /* ---------------- render ---------------- */
+  function render(){
+    var c = calcular();
+
+    $("dataPartida").textContent = new Date(S.criada).toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"});
+    $("totalMesa").textContent = R(c.totalMesa);
+    $("statJogadores").textContent = String(S.jogadores.filter(function(j){ return !j.fora; }).length);
+    $("statCompras").textContent = String(S.eventos.filter(function(e){ return e.de !== null; }).length);
+
+    var somaInv = 0;
+    S.jogadores.forEach(function(j){ somaInv += c.p[j.id].investido; });
+    $("somaInvestido").textContent = S.jogadores.length ? ("Investido: " + R(somaInv)) : "";
+
+    // lista de jogadores
+    var lista = $("listaJogadores");
+    lista.innerHTML = "";
+    if(!S.jogadores.length){
+      lista.appendChild(el("div","empty","Nenhum jogador ainda. Toque em “+ Jogador” para começar a noite."));
+    }
+    S.jogadores.forEach(function(j){
+      var x = c.p[j.id];
+      var row = el("div","player" + (j.fora ? " out" : ""));
+      row.appendChild(fichaEl(j.id));
+
+      var meio = el("div");
+      var nome = el("div","p-name");
+      nome.appendChild(document.createTextNode(j.nome));
+      if(j.fora) nome.appendChild(el("span","tag","saiu"));
+      meio.appendChild(nome);
+
+      var linha = el("div","p-line");
+      linha.innerHTML = "Investiu <b class='money'>" + R(x.investido) + "</b>" +
+        (x.credito > 0 ? " · Crédito <b class='money'>" + R(x.credito) + "</b>" : "");
+      meio.appendChild(linha);
+      row.appendChild(meio);
+
+      var acts = el("div","p-actions");
+      if(!j.fora){
+        var bRe = el("button","btn small","Recompra");
+        bRe.type = "button";
+        bRe.addEventListener("click", function(){ abrirCompra(j.id); });
+        acts.appendChild(bRe);
+      }
+      var bMais = el("button","btn icon","⋯");
+      bMais.type = "button";
+      bMais.setAttribute("aria-label","Opções de " + j.nome);
+      bMais.addEventListener("click", function(){ menuJogador(j); });
+      acts.appendChild(bMais);
+      row.appendChild(acts);
+
+      lista.appendChild(row);
+    });
+
+    renderEventos();
+    renderFechamento(c);
+    salvar();
+  }
+
+  function renderEventos(){
+    var box = $("listaEventos");
+    box.innerHTML = "";
+    if(!S.eventos.length){
+      box.appendChild(el("div","ev","Nada registrado ainda."));
+      return;
+    }
+    S.eventos.slice().reverse().forEach(function(ev){
+      var row = el("div","ev");
+      row.appendChild(fichaEl(ev.para !== null ? ev.para : ev.de, true));
+      var t = el("div","txt");
+      if(ev.de === null){
+        t.innerHTML = "<b>" + esc(nomeDe(ev.para)) + "</b> pegou " + R(ev.valor) + " do estoque";
+      }else if(ev.para === null){
+        t.innerHTML = "<b>" + esc(nomeDe(ev.de)) + "</b> devolveu " + R(ev.valor) + " ao estoque";
+      }else{
+        t.innerHTML = "<b>" + esc(nomeDe(ev.para)) + "</b> comprou " + R(ev.valor) + " de <b>" + esc(nomeDe(ev.de)) + "</b>";
+      }
+      row.appendChild(t);
+      var del = el("button","btn icon","×");
+      del.type = "button";
+      del.setAttribute("aria-label","Apagar movimentação");
+      del.addEventListener("click", function(){
+        confirmar("Apagar movimentação?", t.textContent, "Apagar", true, function(){
+          S.eventos = S.eventos.filter(function(e){ return e.id !== ev.id; });
+          render();
+          toast("Movimentação apagada");
+        });
+      });
+      row.appendChild(del);
+      box.appendChild(row);
+    });
+  }
+
+  function esc(s){
+    return String(s).replace(/[&<>"]/g, function(ch){
+      return ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"})[ch];
+    });
+  }
+
+  /* -------- fechamento: inputs criados só quando a estrutura muda -------- */
+  var assinaturaContagem = "";
+  function renderFechamento(c){
+    var sec = $("secFechamento");
+    if(!S.fechando || !S.jogadores.length){
+      sec.classList.add("hidden");
+      return;
+    }
+    sec.classList.remove("hidden");
+
+    var assin = S.jogadores.map(function(j){ return j.id + ":" + j.nome + ":" + (j.fora?1:0); }).join("|");
+    if(assin !== assinaturaContagem){
+      assinaturaContagem = assin;
+      var box = $("listaContagem");
+      box.innerHTML = "";
+      S.jogadores.forEach(function(j){
+        var row = el("div","count-row");
+        row.appendChild(fichaEl(j.id, true));
+        var nm = el("div", null, j.nome + (j.fora ? " (saiu)" : ""));
+        row.appendChild(nm);
+        var inp = document.createElement("input");
+        inp.type = "tel";
+        inp.inputMode = "decimal";
+        inp.className = "money-in";
+        inp.setAttribute("aria-label","Fichas finais de " + j.nome);
+        inp.value = (S.fichas[j.id] !== undefined && S.fichas[j.id] !== null) ? String(S.fichas[j.id]).replace(".",",") : "";
+        if(j.fora){ inp.value = "0"; inp.disabled = true; S.fichas[j.id] = 0; }
+        inp.addEventListener("input", function(){
+          var v = parseMoney(inp.value);
+          S.fichas[j.id] = isNaN(v) ? 0 : v;
+          atualizarResultados();
+          salvar();
+        });
+        row.appendChild(inp);
+        box.appendChild(row);
+      });
+    }
+    atualizarResultados();
+  }
+
+  function atualizarResultados(){
+    var c = calcular();
+    var contado = somaFichasContadas();
+    var dif = arredonda(contado - c.totalMesa);
+
+    var conf = $("conferencia");
+    conf.className = "check" + (Math.abs(dif) < 0.005 ? " ok" : " bad");
+    if(Math.abs(dif) < 0.005){
+      conf.textContent = "Confere: as fichas contadas batem com " + R(c.totalMesa) + " em jogo.";
+    }else{
+      conf.textContent = "Faltam conferir " + R(Math.abs(dif)) + ". Contado: " + R(contado) +
+        " · Deveria dar: " + R(c.totalMesa) + ". " +
+        (dif > 0 ? "Alguém contou fichas a mais." : "Alguém contou fichas a menos.");
+    }
+
+    var lista = S.jogadores.map(function(j){ return c.p[j.id]; });
+
+    var cr = $("cardResultados");
+    cr.innerHTML = "";
+    lista.forEach(function(x){
+      var row = el("div","result-row");
+      row.appendChild(fichaEl(x.id, true));
+      var meio = el("div");
+      meio.appendChild(el("div", null, nomeDe(x.id)));
+      var d = el("div","p-line");
+      d.textContent = "Fichas " + R(x.fichas) + " + crédito " + R(x.credito) + " − investido " + R(x.investido);
+      meio.appendChild(d);
+      row.appendChild(meio);
+      var v = el("div","result-v money " + classeValor(x.resultado), sinal(x.resultado));
+      row.appendChild(v);
+      cr.appendChild(row);
+    });
+
+    var ca = $("cardAcertos");
+    ca.innerHTML = "";
+    var pagtos = acertos(lista);
+    if(!pagtos.length){
+      ca.appendChild(el("div","p-line","Ninguém deve nada a ninguém."));
+    }
+    pagtos.forEach(function(p){
+      var row = el("div","pay");
+      row.appendChild(fichaEl(p.de, true));
+      row.appendChild(el("span", null, nomeDe(p.de)));
+      row.appendChild(el("span","arrow","paga →"));
+      row.appendChild(fichaEl(p.para, true));
+      row.appendChild(el("span", null, nomeDe(p.para)));
+      row.appendChild(el("span","v money", R(p.valor)));
+      ca.appendChild(row);
+    });
+  }
+
+  /* ---------------- ações ---------------- */
+  function novoId(){ return "j" + (S.seq++); }
+
+  function confirmar(titulo, msg, rotuloOk, perigo, aoConfirmar){
+    $("tituloConfirma").textContent = titulo;
+    $("msgConfirma").textContent = msg;
+    var ok = $("okConfirma");
+    ok.textContent = rotuloOk;
+    ok.className = "btn " + (perigo ? "perigo" : "primary");
+    ok.onclick = function(){
+      fecharDialogo($("dlgConfirma"));
+      aoConfirmar();
+    };
+    abrirDialogo($("dlgConfirma"));
+  }
+
+  function abrirDialogo(dlg){
+    if(typeof dlg.showModal === "function") dlg.showModal();
+    else dlg.setAttribute("open","");
+  }
+  function fecharDialogo(dlg){
+    if(typeof dlg.close === "function") dlg.close();
+    else dlg.removeAttribute("open");
+  }
+
+  // -- novo jogador --
+  var origemEntrada = null; // null = estoque de fichas
+  function desenharPicksEntrada(){
+    montarPicks($("picksOrigemEntrada"), opcoesJogadores(true, null, false), origemEntrada, function(id){
+      origemEntrada = id;
+      desenharPicksEntrada();
+    });
+  }
+  function abrirNovoJogador(){
+    origemEntrada = null;
+    $("inNome").value = "";
+    $("inValorEntrada").value = String(S.buyin).replace(".",",");
+    $("errJogador").textContent = "";
+    botoesRapidos($("quickEntrada"), $("inValorEntrada"));
+    desenharPicksEntrada();
+    abrirDialogo($("dlgJogador"));
+    setTimeout(function(){ $("inNome").focus(); }, 60);
+  }
+  $("okJogador").addEventListener("click", function(){
+    var nome = $("inNome").value.trim();
+    var valor = parseMoney($("inValorEntrada").value);
+    var err = $("errJogador");
+    if(!nome){ err.textContent = "Escreva o nome do jogador."; return; }
+    if(isNaN(valor) || valor <= 0){ err.textContent = "Informe o valor do buy-in."; return; }
+    if(origemEntrada !== null && !jogador(origemEntrada)){ err.textContent = "Escolha de onde vêm as fichas."; return; }
+
+    var id = novoId();
+    S.jogadores.push({ id:id, nome:nome, cor: CORES[(S.jogadores.length) % CORES.length], fora:false });
+    S.eventos.push({ id: "e"+(S.seq++), de: origemEntrada, para: id, valor: valor });
+    fecharDialogo($("dlgJogador"));
+    render();
+    toast(nome + " entrou com " + R(valor));
+  });
+
+  // -- comprar fichas --
+  var compraComprador = null, compraVendedor;
+  function abrirCompra(compradorId){
+    compraComprador = compradorId !== undefined ? compradorId : null;
+    compraVendedor = undefined;
+    $("inValorCompra").value = String(S.buyin).replace(".",",");
+    $("errCompra").textContent = "";
+    botoesRapidos($("quickCompra"), $("inValorCompra"));
+    desenharPicksCompra();
+    abrirDialogo($("dlgCompra"));
+  }
+  function desenharPicksCompra(){
+    montarPicks($("picksComprador"), opcoesJogadores(false, null, false), compraComprador, function(id){
+      compraComprador = id;
+      if(compraVendedor === id) compraVendedor = undefined;
+      desenharPicksCompra();
+    });
+    montarPicks($("picksVendedor"), opcoesJogadores(true, compraComprador, false), compraVendedor, function(id){
+      compraVendedor = id;
+      desenharPicksCompra();
+    });
+  }
+  $("okCompra").addEventListener("click", function(){
+    var err = $("errCompra");
+    var valor = parseMoney($("inValorCompra").value);
+    if(!compraComprador){ err.textContent = "Escolha quem está comprando."; return; }
+    if(compraVendedor === undefined){ err.textContent = "Escolha de quem vêm as fichas."; return; }
+    if(compraVendedor !== null && compraVendedor === compraComprador){ err.textContent = "Comprador e vendedor não podem ser a mesma pessoa."; return; }
+    if(isNaN(valor) || valor <= 0){ err.textContent = "Informe o valor da compra."; return; }
+    S.eventos.push({ id:"e"+(S.seq++), de: compraVendedor, para: compraComprador, valor: valor });
+    fecharDialogo($("dlgCompra"));
+    render();
+    toast(nomeDe(compraComprador) + " comprou " + R(valor));
+  });
+
+  // -- saída antecipada --
+  var saidaJogador = null, saidaDestino;
+  function abrirSaida(j){
+    saidaJogador = j.id;
+    saidaDestino = undefined;
+    $("tituloSaida").textContent = j.nome + " está saindo";
+    $("inValorSaida").value = "";
+    $("errSaida").textContent = "";
+    desenharPicksSaida();
+    abrirDialogo($("dlgSaida"));
+    setTimeout(function(){ $("inValorSaida").focus(); }, 60);
+  }
+  function desenharPicksSaida(){
+    montarPicks($("picksDestinoSaida"), opcoesJogadores(true, saidaJogador, false), saidaDestino, function(id){
+      saidaDestino = id;
+      desenharPicksSaida();
+    });
+  }
+  $("okSaida").addEventListener("click", function(){
+    var err = $("errSaida");
+    var valor = parseMoney($("inValorSaida").value);
+    if(isNaN(valor) || valor < 0){ err.textContent = "Informe quanto ele tem em fichas (pode ser 0)."; return; }
+    if(valor > 0 && saidaDestino === undefined){ err.textContent = "Escolha quem fica com as fichas dele."; return; }
+    if(valor > 0 && saidaDestino === null){
+      confirmar("Devolver ao estoque?",
+        "As fichas dele saem da mesa e ninguém compra. Use isto só se as fichas realmente voltarem para a caixa.",
+        "Confirmar", false, function(){ executarSaida(valor); });
+      return;
+    }
+    executarSaida(valor);
+  });
+
+  function executarSaida(valor){
+    if(valor > 0){
+      S.eventos.push({ id:"e"+(S.seq++), de: saidaJogador, para: saidaDestino, valor: valor });
+    }
+    var j = jogador(saidaJogador);
+    j.fora = true;
+    S.fichas[saidaJogador] = 0;
+    fecharDialogo($("dlgSaida"));
+    assinaturaContagem = "";
+    render();
+    toast(j.nome + " saiu do jogo");
+  }
+
+  // -- renomear --
+  var renomeando = null;
+  function abrirRenomear(j){
+    renomeando = j.id;
+    $("inNovoNome").value = j.nome;
+    abrirDialogo($("dlgRenomear"));
+    setTimeout(function(){ $("inNovoNome").focus(); $("inNovoNome").select(); }, 60);
+  }
+  $("okRenomear").addEventListener("click", function(){
+    var j = jogador(renomeando);
+    var nome = $("inNovoNome").value.trim();
+    if(!j || !nome) return;
+    j.nome = nome.slice(0,18);
+    assinaturaContagem = "";
+    fecharDialogo($("dlgRenomear"));
+    render();
+    toast("Nome alterado");
+  });
+
+  // -- menu do jogador --
+  function menuJogador(j){
+    $("tituloMenu").textContent = j.nome;
+    var box = $("listaMenu");
+    box.innerHTML = "";
+
+    function item(rotulo, cls, acao){
+      var b = el("button", "btn " + (cls || ""), rotulo);
+      b.type = "button";
+      b.addEventListener("click", function(){
+        fecharDialogo($("dlgMenu"));
+        setTimeout(acao, 60);
+      });
+      box.appendChild(b);
+    }
+
+    if(j.fora){
+      item("Fazer voltar ao jogo", "", function(){
+        j.fora = false;
+        delete S.fichas[j.id];
+        assinaturaContagem = "";
+        render();
+        toast(j.nome + " voltou ao jogo");
+      });
+    }else{
+      item("Sair do jogo (cash out)", "", function(){ abrirSaida(j); });
+    }
+
+    item("Renomear", "", function(){ abrirRenomear(j); });
+
+    item("Remover jogador", "item-perigo", function(){
+      var temEventos = S.eventos.some(function(e){ return e.de === j.id || e.para === j.id; });
+      confirmar("Remover " + j.nome + "?",
+        temEventos
+          ? "As movimentações de fichas dele também serão apagadas. Isso muda o total em jogo."
+          : "Ele ainda não tem nenhuma movimentação registrada.",
+        "Remover", true,
+        function(){
+          S.jogadores = S.jogadores.filter(function(x){ return x.id !== j.id; });
+          S.eventos = S.eventos.filter(function(e){ return e.de !== j.id && e.para !== j.id; });
+          delete S.fichas[j.id];
+          assinaturaContagem = "";
+          render();
+          toast(j.nome + " removido");
+        });
+    });
+
+    abrirDialogo($("dlgMenu"));
+  }
+
+  /* ---------------- resumo em texto ---------------- */
+  function resumoTexto(){
+    var c = calcular();
+    var lista = S.jogadores.map(function(j){ return c.p[j.id]; });
+    var L = [];
+    L.push("♠ CASH GAME — " + new Date(S.criada).toLocaleDateString("pt-BR"));
+    L.push("Fichas em jogo: " + R(c.totalMesa));
+    L.push("");
+    L.push("RESULTADO");
+    lista.forEach(function(x){
+      L.push("• " + nomeDe(x.id) + ": " + sinal(x.resultado) +
+        "  (investiu " + R(x.investido) + (x.credito ? ", crédito " + R(x.credito) : "") + ", terminou com " + R(x.fichas) + ")");
+    });
+    var pg = acertos(lista);
+    L.push("");
+    L.push("ACERTO DAS CONTAS");
+    if(!pg.length){ L.push("• Ninguém deve nada a ninguém."); }
+    pg.forEach(function(p){ L.push("• " + nomeDe(p.de) + " paga " + R(p.valor) + " para " + nomeDe(p.para)); });
+    var dif = arredonda(somaFichasContadas() - c.totalMesa);
+    if(Math.abs(dif) >= 0.005){
+      L.push("");
+      L.push("⚠ Atenção: a contagem das fichas não fechou (diferença de " + R(Math.abs(dif)) + ").");
+    }
+    return L.join("\n");
+  }
+
+  function copiar(txt, msgOk){
+    function fallback(){
+      var ta = document.createElement("textarea");
+      ta.value = txt;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      try{ document.execCommand("copy"); toast(msgOk); }
+      catch(e){ mostrarTexto("Copie manualmente", "Seu navegador bloqueou a cópia automática. Segure o dedo sobre o texto, selecione tudo e copie.", txt, false); }
+      document.body.removeChild(ta);
+    }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(txt).then(function(){ toast(msgOk); }, fallback);
+    }else{ fallback(); }
+  }
+
+  /* ---------------- eventos de UI ---------------- */
+  $("btnNovoJogador").addEventListener("click", abrirNovoJogador);
+  $("btnComprar").addEventListener("click", function(){
+    if(S.jogadores.filter(function(j){ return !j.fora; }).length < 1){
+      toast("Adicione jogadores primeiro");
+      return;
+    }
+    abrirCompra();
+  });
+
+  $("buyinPadrao").addEventListener("change", function(){
+    var v = parseMoney(this.value);
+    S.buyin = (isNaN(v) || v <= 0) ? 50 : v;
+    this.value = String(S.buyin).replace(".",",");
+    salvar();
+  });
+
+  $("btnCopiar").addEventListener("click", function(){
+    copiar(resumoTexto(), "Resumo copiado");
+  });
+
+  $("btnNova").addEventListener("click", function(){
+    confirmar("Começar uma partida nova?",
+      "Tudo que está registrado agora será apagado. Se quiser guardar esta noite, use o Backup antes.",
+      "Apagar e começar", true, function(){
+        S = partidaNova();
+        assinaturaContagem = "";
+        $("buyinPadrao").value = "50";
+        $("detHistorico").open = false;
+        render();
+        toast("Nova partida");
+      });
+  });
+
+  function mostrarTexto(titulo, ajuda, txt, permiteCopiar){
+    $("tituloTexto").textContent = titulo;
+    $("ajudaTexto").textContent = ajuda;
+    $("inTexto").value = txt;
+    $("errTexto").textContent = "";
+    var ok = $("okTexto");
+    ok.textContent = permiteCopiar ? "Copiar" : "Fechar";
+    ok.onclick = permiteCopiar
+      ? function(){ copiar($("inTexto").value, "Copiado"); }
+      : function(){ fecharDialogo($("dlgTexto")); };
+    abrirDialogo($("dlgTexto"));
+  }
+
+  $("btnBackup").addEventListener("click", function(){
+    mostrarTexto("Backup",
+      "Copie este código e guarde onde quiser (bloco de notas, WhatsApp para você mesmo). Ele restaura a partida inteira em outro celular.",
+      JSON.stringify(S), true);
+  });
+
+  $("btnRestaurar").addEventListener("click", function(){
+    $("tituloTexto").textContent = "Restaurar";
+    $("ajudaTexto").textContent = "Cole aqui um código de backup. Isso substitui a partida atual.";
+    $("inTexto").value = "";
+    $("okTexto").textContent = "Restaurar";
+    $("errTexto").textContent = "";
+    $("okTexto").onclick = function(){
+      try{
+        var o = JSON.parse($("inTexto").value);
+        if(!o || !o.jogadores || !o.eventos) throw new Error("formato");
+        S = o;
+        if(!S.fichas) S.fichas = {};
+        if(!S.seq) S.seq = 1000;
+        assinaturaContagem = "";
+        $("buyinPadrao").value = String(S.buyin || 50).replace(".",",");
+        fecharDialogo($("dlgTexto"));
+        render();
+        toast("Partida restaurada");
+      }catch(e){
+        $("errTexto").textContent = "Esse código não é válido. Cole o texto completo do backup.";
+      }
+    };
+    abrirDialogo($("dlgTexto"));
+  });
+
+  // Cancelar fecha; Enter em qualquer campo confirma (nunca cancela).
+  [["formJogador","okJogador"],["formCompra","okCompra"],["formSaida","okSaida"],["formTexto","okTexto"],["formRenomear","okRenomear"]].forEach(function(par){
+    var f = $(par[0]);
+    if(!f) return;
+    f.addEventListener("submit", function(ev){
+      ev.preventDefault();
+      $(par[1]).click();
+    });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll(".cancelar"), function(b){
+    b.addEventListener("click", function(){
+      var d = b.closest("dialog");
+      if(d) fecharDialogo(d);
+    });
+  });
+
+  // fechar diálogo tocando fora do painel
+  ["dlgJogador","dlgCompra","dlgSaida","dlgTexto","dlgConfirma","dlgMenu","dlgRenomear"].forEach(function(id){
+    var d = $(id);
+    d.addEventListener("click", function(ev){
+      if(ev.target === d) fecharDialogo(d);
+    });
+  });
+
+  // botão "fechar caixa" na barra inferior muda conforme o estado
+  var barra = document.querySelector(".actionbar .inner");
+  var btnFechar = el("button","btn wide ghost","Fechar caixa e ver o resultado");
+  btnFechar.type = "button";
+  btnFechar.style.gridColumn = "1 / -1";
+  btnFechar.addEventListener("click", function(){
+    S.fechando = !S.fechando;
+    assinaturaContagem = "";
+    render();
+    if(S.fechando){
+      btnFechar.textContent = "Voltar ao jogo";
+      $("secFechamento").scrollIntoView({behavior:"smooth", block:"start"});
+    }else{
+      btnFechar.textContent = "Fechar caixa e ver o resultado";
+    }
+  });
+  barra.appendChild(btnFechar);
+
+  /* ---------------- início ---------------- */
+  S = carregar();
+  if(!S.fichas) S.fichas = {};
+  if(!S.seq) S.seq = 1000;
+  $("buyinPadrao").value = String(S.buyin || 50).replace(".",",");
+  if(S.fechando) btnFechar.textContent = "Voltar ao jogo";
+  render();
+})();
+</script>
