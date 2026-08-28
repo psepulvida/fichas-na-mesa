@@ -382,6 +382,7 @@
   .toast.show{opacity:1;}
   @media (prefers-reduced-motion:reduce){*{transition:none !important;}}
   .hidden{display:none !important;}
+  .share-actions{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px;}
 </style>
 
 <div class="wrap">
@@ -430,7 +431,10 @@
     <div class="section-head"><span class="eyebrow">Quem paga quem</span></div>
     <div class="card" id="cardAcertos"></div>
 
-    <button class="btn wide ghost" id="btnCopiar" style="margin-top:12px">Copiar resumo para o WhatsApp</button>
+    <div class="share-actions">
+      <button class="btn ghost" id="btnCopiar">Copiar resumo</button>
+      <button class="btn ghost" id="btnWhatsApp">Compartilhar no WhatsApp</button>
+    </div>
   </section>
 
   <details id="detHistorico">
@@ -1230,6 +1234,9 @@
 
   $("btnCopiar").addEventListener("click", function(){
     copiar(resumoTexto(), "Resumo copiado");
+  });
+  $("btnWhatsApp").addEventListener("click", function(){
+    window.open("https://wa.me/?text=" + encodeURIComponent(resumoTexto()), "_blank");
   });
 
   $("btnNova").addEventListener("click", function(){
