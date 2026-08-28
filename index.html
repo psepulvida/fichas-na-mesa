@@ -337,6 +337,17 @@
   .pay:last-child{border-bottom:none;}
   .pay .arrow{color:var(--brass); font-weight:600;}
   .pay .v{margin-left:auto; font-weight:600;}
+  .pix-linha{
+    flex-basis:100%;
+    display:flex; align-items:center; gap:8px;
+    margin-top:2px;
+  }
+  .pix-chave{
+    font-family:"IBM Plex Mono", ui-monospace, monospace;
+    font-size:var(--fs-small);
+    color:var(--muted);
+    word-break:break-all;
+  }
 
   /* ---------- histórico ---------- */
   details{margin-top:12px;}
@@ -467,7 +478,7 @@
       <input type="text" id="inNome" autocomplete="off" enterkeyhint="done" maxlength="18">
     </label>
     <label class="field">
-      <span class="eyebrow">Chave PIX</span>
+      <span class="eyebrow">Chave PIX (opcional)</span>
       <input type="text" id="inPix" autocomplete="off" maxlength="100">
     </label>
     <label class="field">
@@ -575,11 +586,16 @@
 <!-- diálogo: renomear -->
 <dialog id="dlgRenomear">
   <form method="dialog" class="sheet" id="formRenomear">
-    <h2>Renomear jogador</h2>
+    <h2>Editar jogador</h2>
     <label class="field">
       <span class="eyebrow">Nome</span>
-      <input type="text" id="inNovoNome" autocomplete="off" maxlength="18" enterkeyhint="done">
+      <input type="text" id="inNovoNome" autocomplete="off" maxlength="18">
     </label>
+    <label class="field">
+      <span class="eyebrow">Chave PIX (opcional)</span>
+      <input type="text" id="inNovoPix" autocomplete="off" maxlength="100" enterkeyhint="done">
+    </label>
+    <div class="err" id="errRenomear"></div>
     <div class="sheet-actions">
       <button class="btn ghost cancelar" type="button">Cancelar</button>
       <button class="btn primary" id="okRenomear" type="button">Salvar</button>
@@ -954,6 +970,19 @@
       row.appendChild(fichaEl(p.para, true));
       row.appendChild(el("span", null, nomeDe(p.para)));
       row.appendChild(el("span","v money", R(p.valor)));
+
+      var recebedor = jogador(p.para);
+      var pix = el("div","pix-linha");
+      if(recebedor && recebedor.pix){
+        pix.appendChild(el("span","eyebrow","PIX"));
+        pix.appendChild(el("span","pix-chave", recebedor.pix));
+      }else if(recebedor){
+        var add = el("button","btn small ghost","+ Cadastrar PIX de " + recebedor.nome);
+        add.type = "button";
+        add.addEventListener("click", function(){ abrirRenomear(recebedor); });
+        pix.appendChild(add);
+      }
+      row.appendChild(pix);
       ca.appendChild(row);
     });
   }
@@ -1099,23 +1128,29 @@
     toast(j.nome + " saiu do jogo");
   }
 
-  // -- renomear --
-  var renomeando = null;
+  // -- editar jogador (nome e chave PIX) --
+  var editando = null;
   function abrirRenomear(j){
-    renomeando = j.id;
+    editando = j.id;
     $("inNovoNome").value = j.nome;
+    $("inNovoPix").value = j.pix || "";
+    $("errRenomear").textContent = "";
     abrirDialogo($("dlgRenomear"));
     setTimeout(function(){ $("inNovoNome").focus(); $("inNovoNome").select(); }, 60);
   }
   $("okRenomear").addEventListener("click", function(){
-    var j = jogador(renomeando);
+    var j = jogador(editando);
     var nome = $("inNovoNome").value.trim();
-    if(!j || !nome) return;
+    var pix = $("inNovoPix").value.trim();
+    if(!j) return;
+    if(!nome){ $("errRenomear").textContent = "O nome não pode ficar vazio."; return; }
+    var mudouPix = (j.pix || "") !== pix;
     j.nome = nome.slice(0,18);
+    j.pix = pix;
     assinaturaContagem = "";
     fecharDialogo($("dlgRenomear"));
     render();
-    toast("Nome alterado");
+    toast(mudouPix ? "Dados salvos" : "Nome alterado");
   });
 
   // -- menu do jogador --
@@ -1146,7 +1181,7 @@
       item("Sair do jogo (cash out)", "", function(){ abrirSaida(j); });
     }
 
-    item("Renomear", "", function(){ abrirRenomear(j); });
+    item("Editar nome e PIX", "", function(){ abrirRenomear(j); });
 
     item("Remover jogador", "item-perigo", function(){
       var temEventos = S.eventos.some(function(e){ return e.de === j.id || e.para === j.id; });
