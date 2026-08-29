@@ -217,7 +217,7 @@
   }
 
   /* ---------- inputs ---------- */
-  input[type="text"], input[type="tel"]{
+  input[type="text"], input[type="tel"], input[type="password"]{
     appearance:none;
     width:100%;
     background:var(--ground);
@@ -368,6 +368,58 @@
   .ev .txt{flex:1;}
   .ev .txt b{color:var(--text); font-weight:600;}
 
+  .abas{
+    display:flex; gap:6px;
+    background:var(--surface);
+    border:1px solid var(--line-soft);
+    border-radius:12px;
+    padding:4px;
+    margin-bottom:18px;
+  }
+  .aba{
+    flex:1;
+    appearance:none;
+    border:none;
+    background:transparent;
+    color:var(--muted);
+    font-family:inherit;
+    font-size:var(--fs-small);
+    font-weight:600;
+    letter-spacing:.02em;
+    padding:9px 10px;
+    min-height:38px;
+    border-radius:9px;
+    cursor:pointer;
+  }
+  .aba[aria-pressed="true"]{
+    background:var(--surface-2);
+    color:var(--text);
+    box-shadow:inset 0 0 0 1px var(--line);
+  }
+  .aba:focus-visible{outline:2px solid var(--brass); outline-offset:2px;}
+
+  .rank-row{
+    display:grid;
+    grid-template-columns:auto auto 1fr auto;
+    align-items:center;
+    gap:11px;
+    padding:13px 0;
+    border-bottom:1px solid var(--line-soft);
+  }
+  .rank-row:last-child{border-bottom:none;}
+  .pos{
+    font-family:"Fraunces", Georgia, serif;
+    font-size:var(--fs-lead);
+    font-weight:700;
+    color:var(--faint);
+    min-width:22px;
+    text-align:center;
+    font-variant-numeric:tabular-nums;
+  }
+  .rank-row.lider .pos{color:var(--brass);}
+  .rank-nome{font-weight:600; line-height:1.2;}
+  .rank-saldo{font-size:var(--fs-lead); font-weight:600;}
+
   .aviso{
     margin-top:12px;
     border:1px solid var(--brass-dim);
@@ -409,6 +461,12 @@
     </div>
   </header>
 
+  <div class="abas" role="tablist">
+    <button class="aba" id="abaPartida" type="button" aria-pressed="true">Partida de hoje</button>
+    <button class="aba" id="abaRanking" type="button" aria-pressed="false">Ranking</button>
+  </div>
+
+  <div id="telaPartida">
   <div class="table-panel">
     <span class="eyebrow">Fichas em jogo na mesa</span>
     <div class="table-total money" id="totalMesa">R$ 0,00</div>
@@ -446,6 +504,8 @@
       <button class="btn ghost" id="btnCopiar">Copiar resumo</button>
       <button class="btn ghost" id="btnWhatsApp">Compartilhar no WhatsApp</button>
     </div>
+    <button class="btn wide primary" id="btnArquivar" style="margin-top:8px">Arquivar no ranking</button>
+    <p class="sub" id="ajudaArquivar" style="margin-top:8px">Grava o resultado desta noite no ranking do grupo. Precisa de internet e da senha.</p>
   </section>
 
   <details id="detHistorico">
@@ -458,6 +518,28 @@
     <button class="btn small ghost" id="btnRestaurar">Restaurar</button>
     <button class="btn small ghost" id="btnNova" style="margin-left:auto">Nova partida</button>
   </footer>
+  </div><!-- fim telaPartida -->
+
+  <div id="telaRanking" class="hidden">
+    <div class="table-panel">
+      <span class="eyebrow">Quem está na frente</span>
+      <div class="table-total money" id="rankLider">—</div>
+      <div class="sub" id="rankLiderNome">Nenhuma noite arquivada ainda</div>
+      <div class="table-grid">
+        <div><span class="eyebrow">Noites jogadas</span><span class="stat-v" id="rankNoites">0</span></div>
+        <div><span class="eyebrow">Jogadores</span><span class="stat-v" id="rankJogadores">0</span></div>
+      </div>
+    </div>
+
+    <div class="section-head">
+      <span class="eyebrow">Classificação</span>
+      <button class="btn small ghost" id="btnAtualizarRanking" type="button">Atualizar</button>
+    </div>
+    <div class="card" id="cardRanking"></div>
+
+    <div class="section-head"><span class="eyebrow">Noites arquivadas</span></div>
+    <div class="card" id="cardNoites"></div>
+  </div>
 </div>
 
 <div class="actionbar">
@@ -473,6 +555,10 @@
 <dialog id="dlgJogador">
   <form method="dialog" class="sheet" id="formJogador">
     <h2>Novo jogador</h2>
+    <div class="field" id="campoGrupo">
+      <span class="eyebrow">Do grupo</span>
+      <div class="picks" id="picksGrupo"></div>
+    </div>
     <label class="field">
       <span class="eyebrow">Nome</span>
       <input type="text" id="inNome" autocomplete="off" enterkeyhint="done" maxlength="18">
@@ -583,6 +669,23 @@
   </div>
 </dialog>
 
+<!-- diálogo: senha do grupo -->
+<dialog id="dlgSenha">
+  <form method="dialog" class="sheet" id="formSenha">
+    <h2>Senha do grupo</h2>
+    <p class="sub" style="margin-top:0">Necessária para gravar no ranking. Fica guardada neste celular, só é pedida de novo se mudar.</p>
+    <label class="field">
+      <span class="eyebrow">Senha</span>
+      <input type="password" id="inSenha" autocomplete="off" enterkeyhint="done">
+    </label>
+    <div class="err" id="errSenha"></div>
+    <div class="sheet-actions">
+      <button class="btn ghost cancelar" type="button">Cancelar</button>
+      <button class="btn primary" id="okSenha" type="button">Confirmar</button>
+    </div>
+  </form>
+</dialog>
+
 <!-- diálogo: renomear -->
 <dialog id="dlgRenomear">
   <form method="dialog" class="sheet" id="formRenomear">
@@ -609,12 +712,117 @@
 
   var CORES = ["#4A7BE0","#9B6BE0","#35A9BC","#DE6296","#9AA83F","#A87A52","#7E8FA3","#5C64D6"];
   var CHAVE = "fichas-na-mesa-v1";
+  var CHAVE_GRUPO = "fichas-grupo-v1";
+  var CHAVE_SENHA = "fichas-senha-v1";
+
+  /* =====================================================================
+     Banco de dados do ranking (Supabase)
+
+     Esta chave é pública de propósito: quem decide o que é permitido é o
+     banco, não este arquivo. Ler o ranking é liberado; gravar só através
+     das funções que exigem a senha do grupo. Ver banco.sql.
+     ===================================================================== */
+  var BANCO = {
+    url: "https://httdmzlyagiyowbpthhl.supabase.co",
+    key: "sb_publishable_wGqYreUQsELcGinnZyGWkA_1jL94r96"
+  };
+
+  function cabecalhosBanco(){
+    return {
+      "apikey": BANCO.key,
+      "Authorization": "Bearer " + BANCO.key,
+      "Content-Type": "application/json"
+    };
+  }
+
+  // Traduz os erros do banco para algo que se entenda na mesa de poker.
+  var ERROS = {
+    SENHA_INVALIDA:  "Senha do grupo incorreta.",
+    NOITE_DUPLICADA: "Já existe uma noite gravada nesta data.",
+    NOITE_NAO_FECHA: "Os resultados não somam zero — confira a contagem das fichas antes de arquivar.",
+    SEM_RESULTADOS:  "Nenhum jogador para arquivar.",
+    NOME_VAZIO:      "Jogador sem nome."
+  };
+
+  function erroLegivel(e){
+    var m = (e && e.message) ? String(e.message) : "";
+    if(ERROS[m]) return ERROS[m];
+    if(/Failed to fetch|NetworkError|Load failed/i.test(m)){
+      return "Sem conexão com a internet. A partida continua salva no celular.";
+    }
+    return m || "Não deu para falar com o servidor.";
+  }
+
+  function lerBanco(caminho){
+    return fetch(BANCO.url + "/rest/v1/" + caminho, { headers: cabecalhosBanco() })
+      .then(function(r){
+        return r.json().then(function(dados){
+          if(!r.ok) throw new Error(dados && dados.message ? dados.message : "HTTP " + r.status);
+          return dados;
+        });
+      });
+  }
+
+  function chamarBanco(funcao, corpo){
+    return fetch(BANCO.url + "/rest/v1/rpc/" + funcao, {
+      method: "POST",
+      headers: cabecalhosBanco(),
+      body: JSON.stringify(corpo)
+    }).then(function(r){
+      return r.text().then(function(txt){
+        var dados = null;
+        try{ dados = txt ? JSON.parse(txt) : null; }catch(e){ dados = txt; }
+        if(!r.ok){
+          throw new Error(dados && dados.message ? dados.message : "HTTP " + r.status);
+        }
+        return dados;
+      });
+    });
+  }
+
+  /* ---- jogadores do grupo: cache local, para funcionar sem internet ---- */
+  var grupo = [];
+  function carregarGrupoLocal(){
+    try{
+      var raw = localStorage.getItem(CHAVE_GRUPO);
+      grupo = raw ? JSON.parse(raw) : [];
+    }catch(e){ grupo = []; }
+    if(!Array.isArray(grupo)) grupo = [];
+  }
+  function guardarGrupoLocal(){
+    try{ localStorage.setItem(CHAVE_GRUPO, JSON.stringify(grupo)); }catch(e){}
+  }
+  function atualizarGrupo(){
+    return lerBanco("jogadores?select=id,nome,pix&order=nome.asc").then(function(lista){
+      grupo = lista || [];
+      guardarGrupoLocal();
+      return grupo;
+    });
+  }
+  function doGrupoPorNome(nome){
+    var alvo = String(nome || "").trim().toLowerCase();
+    for(var i=0;i<grupo.length;i++){
+      if(String(grupo[i].nome).trim().toLowerCase() === alvo) return grupo[i];
+    }
+    return null;
+  }
+
+  /* ---- senha do grupo, guardada para não digitar toda noite ---- */
+  function senhaGuardada(){
+    try{ return localStorage.getItem(CHAVE_SENHA) || ""; }catch(e){ return ""; }
+  }
+  function guardarSenha(s){
+    try{ localStorage.setItem(CHAVE_SENHA, s); }catch(e){}
+  }
+  function esquecerSenha(){
+    try{ localStorage.removeItem(CHAVE_SENHA); }catch(e){}
+  }
 
   var S = null;
 
   /* ---------------- persistência ---------------- */
   function partidaNova(){
-    return { criada: new Date().toISOString(), buyin: 50, jogadores: [], eventos: [], fichas: {}, fechando: false, seq: 1 };
+    return { criada: new Date().toISOString(), buyin: 50, jogadores: [], eventos: [], fichas: {}, fechando: false, seq: 1, arquivada: null };
   }
   var podeSalvar = true;
   function salvar(){
@@ -840,6 +1048,8 @@
 
     renderEventos();
     renderFechamento(c);
+    marcarArquivada();
+    atualizarBotaoFechar();
     salvar();
   }
 
@@ -1014,6 +1224,34 @@
 
   // -- novo jogador --
   var origemEntrada = null; // null = estoque de fichas
+  // Mostra quem já é do grupo, para o ranking não virar "Paulo", "paulo" e "Paulinho".
+  function desenharPicksGrupo(){
+    var campo = $("campoGrupo");
+    var box = $("picksGrupo");
+    box.innerHTML = "";
+
+    var naMesa = {};
+    S.jogadores.forEach(function(j){ naMesa[String(j.nome).trim().toLowerCase()] = true; });
+    var livres = grupo.filter(function(g){ return !naMesa[String(g.nome).trim().toLowerCase()]; });
+
+    campo.classList.toggle("hidden", livres.length === 0);
+    livres.forEach(function(g, i){
+      var b = el("button","pick");
+      b.type = "button";
+      var ficha = el("span","chip sm");
+      ficha.style.setProperty("--c", CORES[i % CORES.length]);
+      b.appendChild(ficha);
+      b.appendChild(document.createTextNode(g.nome));
+      b.addEventListener("click", function(){
+        $("inNome").value = g.nome;
+        $("inPix").value = g.pix || "";
+        $("errJogador").textContent = "";
+        $("inValorEntrada").focus();
+      });
+      box.appendChild(b);
+    });
+  }
+
   function desenharPicksEntrada(){
     montarPicks($("picksOrigemEntrada"), opcoesJogadores(true, null, false), origemEntrada, function(id){
       origemEntrada = id;
@@ -1027,6 +1265,7 @@
     $("inValorEntrada").value = String(S.buyin).replace(".",",");
     $("errJogador").textContent = "";
     botoesRapidos($("quickEntrada"), $("inValorEntrada"));
+    desenharPicksGrupo();
     desenharPicksEntrada();
     abrirDialogo($("dlgJogador"));
     setTimeout(function(){ $("inNome").focus(); }, 60);
@@ -1039,6 +1278,13 @@
     if(!nome){ err.textContent = "Escreva o nome do jogador."; return; }
     if(isNaN(valor) || valor <= 0){ err.textContent = "Informe o valor do buy-in."; return; }
     if(origemEntrada !== null && !jogador(origemEntrada)){ err.textContent = "Escolha de onde vêm as fichas."; return; }
+
+    // "paulo" e "Paulo" viram a mesma pessoa no ranking: usa a grafia já cadastrada.
+    var doGrupo = doGrupoPorNome(nome);
+    if(doGrupo){
+      nome = doGrupo.nome;
+      if(!pix) pix = doGrupo.pix || "";
+    }
 
     var id = novoId();
     S.jogadores.push({ id:id, nome:nome, pix:pix, cor: CORES[(S.jogadores.length) % CORES.length], fora:false });
@@ -1270,6 +1516,8 @@
   $("btnCopiar").addEventListener("click", function(){
     copiar(resumoTexto(), "Resumo copiado");
   });
+  $("btnArquivar").addEventListener("click", function(){ arquivarNoite(false); });
+  $("btnAtualizarRanking").addEventListener("click", function(){ carregarRanking(); });
   $("btnWhatsApp").addEventListener("click", function(){
     window.open("https://wa.me/?text=" + encodeURIComponent(resumoTexto()), "_blank");
   });
@@ -1332,7 +1580,7 @@
   });
 
   // Cancelar fecha; Enter em qualquer campo confirma (nunca cancela).
-  [["formJogador","okJogador"],["formCompra","okCompra"],["formSaida","okSaida"],["formTexto","okTexto"],["formRenomear","okRenomear"]].forEach(function(par){
+  [["formJogador","okJogador"],["formCompra","okCompra"],["formSaida","okSaida"],["formTexto","okTexto"],["formRenomear","okRenomear"],["formSenha","okSenha"]].forEach(function(par){
     var f = $(par[0]);
     if(!f) return;
     f.addEventListener("submit", function(ev){
@@ -1348,7 +1596,7 @@
   });
 
   // fechar diálogo tocando fora do painel
-  ["dlgJogador","dlgCompra","dlgSaida","dlgTexto","dlgConfirma","dlgMenu","dlgRenomear"].forEach(function(id){
+  ["dlgJogador","dlgCompra","dlgSaida","dlgTexto","dlgConfirma","dlgMenu","dlgRenomear","dlgSenha"].forEach(function(id){
     var d = $(id);
     d.addEventListener("click", function(ev){
       if(ev.target === d) fecharDialogo(d);
@@ -1360,25 +1608,257 @@
   var btnFechar = el("button","btn wide ghost","Fechar caixa e ver o resultado");
   btnFechar.type = "button";
   btnFechar.style.gridColumn = "1 / -1";
+  function atualizarBotaoFechar(){
+    if(!btnFechar) return;
+    btnFechar.textContent = S.fechando ? "Voltar ao jogo" : "Fechar caixa e ver o resultado";
+  }
   btnFechar.addEventListener("click", function(){
     S.fechando = !S.fechando;
     assinaturaContagem = "";
     render();
-    if(S.fechando){
-      btnFechar.textContent = "Voltar ao jogo";
-      $("secFechamento").scrollIntoView({behavior:"smooth", block:"start"});
-    }else{
-      btnFechar.textContent = "Fechar caixa e ver o resultado";
-    }
+    if(S.fechando) $("secFechamento").scrollIntoView({behavior:"smooth", block:"start"});
   });
   barra.appendChild(btnFechar);
 
-  /* ---------------- início ---------------- */
+  /* ---------------- abas: partida / ranking ---------------- */
+  var telaAtual = "partida";
+  function mostrarTela(qual){
+    telaAtual = qual;
+    var ehRanking = (qual === "ranking");
+    $("telaPartida").classList.toggle("hidden", ehRanking);
+    $("telaRanking").classList.toggle("hidden", !ehRanking);
+    document.querySelector(".actionbar").classList.toggle("hidden", ehRanking);
+    $("abaPartida").setAttribute("aria-pressed", String(!ehRanking));
+    $("abaRanking").setAttribute("aria-pressed", String(ehRanking));
+    window.scrollTo(0, 0);
+    if(ehRanking) carregarRanking();
+  }
+  $("abaPartida").addEventListener("click", function(){ mostrarTela("partida"); });
+  $("abaRanking").addEventListener("click", function(){ mostrarTela("ranking"); });
+
+  /* ---------------- ranking ---------------- */
+  var rankingCarregando = false;
+  function carregarRanking(){
+    if(rankingCarregando) return;
+    rankingCarregando = true;
+    $("btnAtualizarRanking").disabled = true;
+
+    var caixa = $("cardRanking");
+    if(!caixa.children.length) caixa.appendChild(el("div","p-line","Buscando o ranking..."));
+
+    Promise.all([
+      lerBanco("ranking?select=*&order=saldo.desc"),
+      lerBanco("noites?select=id,data,total_mesa&order=data.desc&limit=30")
+    ]).then(function(res){
+      atualizarGrupo();
+      desenharRanking(res[0] || [], res[1] || []);
+    }).catch(function(e){
+      caixa.innerHTML = "";
+      caixa.appendChild(el("div","check bad", erroLegivel(e)));
+      $("cardNoites").innerHTML = "";
+      $("rankLider").textContent = "-";
+    }).then(function(){
+      rankingCarregando = false;
+      $("btnAtualizarRanking").disabled = false;
+    });
+  }
+
+  function desenharRanking(lista, noites){
+    // Quem está cadastrado mas nunca fechou uma noite não entra na classificação.
+    var comNoites = lista.filter(function(x){ return Number(x.noites) > 0; });
+
+    $("rankNoites").textContent = String(noites.length);
+    $("rankJogadores").textContent = String(comNoites.length);
+    $("rankLider").textContent = comNoites.length ? sinal(comNoites[0].saldo) : "—";
+    $("rankLider").className = "table-total money " + (comNoites.length ? classeValor(comNoites[0].saldo) : "");
+    $("rankLiderNome").textContent = comNoites.length
+      ? comNoites[0].nome + " lidera o acumulado"
+      : "Nenhuma noite arquivada ainda";
+
+    var caixa = $("cardRanking");
+    caixa.innerHTML = "";
+    if(!comNoites.length){
+      caixa.appendChild(el("div","p-line","Nenhuma noite arquivada ainda. Feche o caixa de uma partida e toque em “Arquivar no ranking”."));
+    }
+    comNoites.forEach(function(x, i){
+      var row = el("div","rank-row" + (i === 0 ? " lider" : ""));
+      row.appendChild(el("div","pos", String(i+1) + "\u00ba"));
+
+      var ficha = el("span","chip sm");
+      ficha.style.setProperty("--c", CORES[i % CORES.length]);
+      row.appendChild(ficha);
+
+      var meio = el("div");
+      meio.appendChild(el("div","rank-nome", x.nome));
+      var d = el("div","p-line");
+      d.textContent = x.noites + (Number(x.noites) === 1 ? " noite" : " noites") +
+        " \u00b7 m\u00e9dia " + R(x.media) + " \u00b7 melhor " + sinal(x.melhor);
+      meio.appendChild(d);
+      row.appendChild(meio);
+
+      row.appendChild(el("div","rank-saldo money " + classeValor(x.saldo), sinal(x.saldo)));
+      caixa.appendChild(row);
+    });
+
+    var cn = $("cardNoites");
+    cn.innerHTML = "";
+    if(!noites.length){
+      cn.appendChild(el("div","p-line","Nada arquivado ainda."));
+    }
+    noites.forEach(function(n){
+      var row = el("div","ev");
+      var t = el("div","txt");
+      var partes = String(n.data).split("-");
+      t.innerHTML = "<b>" + partes[2] + "/" + partes[1] + "/" + partes[0] + "</b> \u00b7 " + R(n.total_mesa) + " em jogo";
+      row.appendChild(t);
+
+      var del = el("button","btn icon","\u00d7");
+      del.type = "button";
+      del.setAttribute("aria-label","Apagar esta noite do ranking");
+      del.addEventListener("click", function(){
+        confirmar("Apagar esta noite do ranking?",
+          "O resultado dela sai do ranking de todo mundo. Isso não apaga a partida guardada no seu celular.",
+          "Apagar", true, function(){
+            pedirSenha(function(senha){
+              chamarBanco("apagar_noite", { p_senha: senha, p_noite_id: n.id })
+                .then(function(){ guardarSenha(senha); toast("Noite apagada"); carregarRanking(); })
+                .catch(function(e){
+                  if(e && e.message === "SENHA_INVALIDA") esquecerSenha();
+                  avisarErro(erroLegivel(e));
+                });
+            });
+          });
+      });
+      row.appendChild(del);
+      cn.appendChild(row);
+    });
+  }
+
+  /* ---------------- arquivar a noite ---------------- */
+  function avisarErro(msg){
+    $("tituloConfirma").textContent = "N\u00e3o deu certo";
+    $("msgConfirma").textContent = msg;
+    var ok = $("okConfirma");
+    ok.textContent = "Entendi";
+    ok.className = "btn primary";
+    ok.onclick = function(){ fecharDialogo($("dlgConfirma")); };
+    abrirDialogo($("dlgConfirma"));
+  }
+
+  var aoConfirmarSenha = null;
+  function pedirSenha(depois){
+    var guardada = senhaGuardada();
+    if(guardada){ depois(guardada); return; }
+    aoConfirmarSenha = depois;
+    $("inSenha").value = "";
+    $("errSenha").textContent = "";
+    abrirDialogo($("dlgSenha"));
+    setTimeout(function(){ $("inSenha").focus(); }, 60);
+  }
+  $("okSenha").addEventListener("click", function(){
+    var senha = $("inSenha").value.trim();
+    if(!senha){ $("errSenha").textContent = "Digite a senha do grupo."; return; }
+    fecharDialogo($("dlgSenha"));
+    if(aoConfirmarSenha) aoConfirmarSenha(senha);
+  });
+
+  function arquivarNoite(forcar){
+    var c = calcular();
+    var dif = arredonda(somaFichasContadas() - c.totalMesa);
+    if(Math.abs(dif) >= 0.005){
+      avisarErro("A contagem das fichas ainda não fecha (diferença de " + R(Math.abs(dif)) +
+                 "). Acerte a contagem antes de arquivar, senão o ranking herda o erro.");
+      return;
+    }
+    if(!S.jogadores.length){ avisarErro("Não há jogadores nesta partida."); return; }
+
+    pedirSenha(function(senha){
+      var btn = $("btnArquivar");
+      btn.disabled = true;
+      btn.textContent = "Arquivando...";
+
+      // Garante que todo mundo existe no cadastro do grupo antes de gravar a noite.
+      var cadastros = S.jogadores.map(function(j){
+        return chamarBanco("salvar_jogador", {
+          p_senha: senha,
+          p_nome: j.nome,
+          p_pix: j.pix || null
+        }).then(function(id){ return { local: j.id, banco: id }; });
+      });
+
+      Promise.all(cadastros).then(function(ids){
+        var mapa = {};
+        ids.forEach(function(x){ mapa[x.local] = x.banco; });
+
+        var resultados = S.jogadores.map(function(j){
+          var x = c.p[j.id];
+          return {
+            jogador_id: mapa[j.id],
+            investido: x.investido,
+            credito: x.credito,
+            fichas_final: x.fichas,
+            resultado: x.resultado
+          };
+        });
+
+        var d = new Date(S.criada);
+        var data = d.getFullYear() + "-" +
+                   String(d.getMonth()+1).padStart(2,"0") + "-" +
+                   String(d.getDate()).padStart(2,"0");
+
+        return chamarBanco("arquivar_noite", {
+          p_senha: senha,
+          p_data: data,
+          p_total: c.totalMesa,
+          p_resultados: resultados,
+          p_forcar: !!forcar
+        });
+      }).then(function(noiteId){
+        guardarSenha(senha);
+        S.arquivada = noiteId;
+        salvar();
+        atualizarGrupo();
+        toast("Noite arquivada no ranking");
+        mostrarTela("ranking");
+      }).catch(function(e){
+        var msg = e && e.message;
+        if(msg === "SENHA_INVALIDA") esquecerSenha();
+        if(msg === "NOITE_DUPLICADA"){
+          confirmar("Já existe uma noite nesta data",
+            "Isso costuma acontecer quando outra pessoa já arquivou esta mesma noite. Se vocês jogaram duas vezes no mesmo dia, dá para gravar assim mesmo.",
+            "Gravar assim mesmo", false, function(){ arquivarNoite(true); });
+        }else{
+          avisarErro(erroLegivel(e));
+        }
+      }).then(function(){
+        $("btnArquivar").disabled = false;
+        marcarArquivada();
+      });
+    });
+  }
+
+  function marcarArquivada(){
+    var b = $("btnArquivar");
+    if(!b) return;
+    if(S.arquivada){
+      b.textContent = "Noite já arquivada ✓";
+      b.classList.remove("primary");
+      b.classList.add("ghost");
+    }else{
+      b.textContent = "Arquivar no ranking";
+      b.classList.add("primary");
+      b.classList.remove("ghost");
+    }
+  }
+
+  /* ---------------- in\u00edcio ---------------- */
   S = carregar();
   if(!S.fichas) S.fichas = {};
   if(!S.seq) S.seq = 1000;
+  if(S.arquivada === undefined) S.arquivada = null;
+  carregarGrupoLocal();
+  atualizarGrupo().catch(function(){ /* sem internet: usa o cache local */ });
   $("buyinPadrao").value = String(S.buyin || 50).replace(".",",");
-  if(S.fechando) btnFechar.textContent = "Voltar ao jogo";
   render();
 })();
 </script>

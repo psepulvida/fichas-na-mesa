@@ -22,6 +22,11 @@ create table if not exists jogadores (
   criado_em  timestamptz not null default now()
 );
 
+-- "Paulo" e "paulo" seriam duas linhas diferentes com o unique comum acima,
+-- e o ranking apareceria dividido em duas pessoas. Este indice trata as duas
+-- grafias como a mesma pessoa.
+create unique index if not exists jogadores_nome_unico on jogadores (lower(nome));
+
 -- Cada noite de jogo arquivada.
 create table if not exists noites (
   id          bigint generated always as identity primary key,
@@ -125,7 +130,7 @@ begin
 
   insert into jogadores (nome, pix)
   values (trim(p_nome), nullif(trim(coalesce(p_pix, '')), ''))
-  on conflict (nome) do update set pix = excluded.pix
+  on conflict (lower(nome)) do update set pix = coalesce(excluded.pix, jogadores.pix)
   returning id into v_id;
 
   return v_id;
@@ -213,6 +218,29 @@ end;
 $$;
 
 
+-- Tira alguem do cadastro do grupo. Recusa se a pessoa ja tem noites
+-- arquivadas, senao o ranking perderia partidas ja jogadas.
+create or replace function apagar_jogador(p_senha text, p_jogador_id bigint)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not conferir_senha(p_senha) then
+    raise exception 'SENHA_INVALIDA';
+  end if;
+
+  if exists (select 1 from resultados where jogador_id = p_jogador_id) then
+    raise exception 'JOGADOR_TEM_NOITES';
+  end if;
+
+  delete from jogadores where id = p_jogador_id;
+end;
+$$;
+
+
+grant execute on function apagar_jogador(text, bigint)                            to anon, authenticated;
 grant execute on function salvar_jogador(text, text, text)                        to anon, authenticated;
 grant execute on function arquivar_noite(text, date, numeric, jsonb, boolean)     to anon, authenticated;
 grant execute on function apagar_noite(text, bigint)                              to anon, authenticated;
