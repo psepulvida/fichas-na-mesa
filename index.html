@@ -536,6 +536,7 @@
       <button class="btn small ghost" id="btnAtualizarRanking" type="button">Atualizar</button>
     </div>
     <div class="card" id="cardRanking"></div>
+    <button class="btn wide ghost" id="btnCompartilharRanking" type="button" style="margin-top:8px" disabled>Compartilhar ranking</button>
 
     <div class="section-head"><span class="eyebrow">Noites arquivadas</span></div>
     <div class="card" id="cardNoites"></div>
@@ -1518,6 +1519,7 @@
   });
   $("btnArquivar").addEventListener("click", function(){ arquivarNoite(false); });
   $("btnAtualizarRanking").addEventListener("click", function(){ carregarRanking(); });
+  $("btnCompartilharRanking").addEventListener("click", compartilharRanking);
   $("btnWhatsApp").addEventListener("click", function(){
     window.open("https://wa.me/?text=" + encodeURIComponent(resumoTexto()), "_blank");
   });
@@ -1663,9 +1665,12 @@
     });
   }
 
+  var ultimoRanking = [];
   function desenharRanking(lista, noites){
     // Quem está cadastrado mas nunca fechou uma noite não entra na classificação.
     var comNoites = lista.filter(function(x){ return Number(x.noites) > 0; });
+    ultimoRanking = comNoites;
+    $("btnCompartilharRanking").disabled = !comNoites.length;
 
     $("rankNoites").textContent = String(noites.length);
     $("rankJogadores").textContent = String(comNoites.length);
@@ -1731,6 +1736,189 @@
       });
       row.appendChild(del);
       cn.appendChild(row);
+    });
+  }
+
+  /* ---------------- compartilhar o ranking como imagem ---------------- */
+  function tokenCor(nomeVar, reserva){
+    try{
+      var v = getComputedStyle(document.documentElement).getPropertyValue(nomeVar).trim();
+      return v || reserva;
+    }catch(e){ return reserva; }
+  }
+
+  function caminhoArredondado(ctx, x, y, w, h, r){
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);
+    ctx.arcTo(x+w, y,   x+w, y+h, r);
+    ctx.arcTo(x+w, y+h, x,   y+h, r);
+    ctx.arcTo(x,   y+h, x,   y,   r);
+    ctx.arcTo(x,   y,   x+w, y,   r);
+    ctx.closePath();
+  }
+
+  function gerarImagemRanking(lista){
+    var PAL = {
+      fundoTopo: tokenCor("--surface-2", "#1D2C28"),
+      fundoBase: tokenCor("--ground", "#101A19"),
+      linha:     tokenCor("--line-soft", "#1F2E2A"),
+      texto:     tokenCor("--text", "#EAF0EC"),
+      apagado:   tokenCor("--muted", "#8FA39C"),
+      fraco:     tokenCor("--faint", "#63776F"),
+      latao:     tokenCor("--brass", "#D6A94E")
+    };
+
+    var DPR = Math.min(window.devicePixelRatio || 1, 3);
+    var W = 720, padX = 40;
+    var headerH = 168, rowH = 78, footH = 64;
+    var H = headerH + lista.length * rowH + footH;
+
+    var canvas = document.createElement("canvas");
+    canvas.width = W * DPR;
+    canvas.height = H * DPR;
+    var ctx = canvas.getContext("2d");
+    ctx.scale(DPR, DPR);
+
+    return document.fonts.ready.then(function(){
+      // fundo
+      var fundo = ctx.createLinearGradient(0, 0, 0, H);
+      fundo.addColorStop(0, PAL.fundoTopo);
+      fundo.addColorStop(1, PAL.fundoBase);
+      ctx.fillStyle = fundo;
+      caminhoArredondado(ctx, 0, 0, W, H, 22);
+      ctx.fill();
+
+      // cabecalho
+      ctx.fillStyle = PAL.fraco;
+      ctx.font = "700 12px Archivo, sans-serif";
+      ctx.textBaseline = "alphabetic";
+      ctx.fillText("C A S H   G A M E", padX, 46);
+
+      ctx.fillStyle = PAL.texto;
+      ctx.font = "700 34px Fraunces, Georgia, serif";
+      ctx.fillText("Ranking do grupo", padX, 88);
+
+      var hoje = new Date();
+      var dataTxt = String(hoje.getDate()).padStart(2,"0") + "/" +
+                    String(hoje.getMonth()+1).padStart(2,"0") + "/" + hoje.getFullYear();
+      ctx.fillStyle = PAL.apagado;
+      ctx.font = "400 14px Archivo, sans-serif";
+      ctx.fillText(lista.length + (lista.length === 1 ? " jogador" : " jogadores") + " · gerado em " + dataTxt, padX, 114);
+
+      ctx.strokeStyle = PAL.linha;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(padX, headerH - 12);
+      ctx.lineTo(W - padX, headerH - 12);
+      ctx.stroke();
+
+      // linhas do ranking
+      lista.forEach(function(x, i){
+        var y = headerH + i * rowH;
+        var meioY = y + rowH/2;
+
+        if(i > 0){
+          ctx.strokeStyle = PAL.linha;
+          ctx.beginPath();
+          ctx.moveTo(padX, y);
+          ctx.lineTo(W - padX, y);
+          ctx.stroke();
+        }
+
+        ctx.fillStyle = (i === 0) ? PAL.latao : PAL.fraco;
+        ctx.font = "700 22px Fraunces, Georgia, serif";
+        ctx.textAlign = "center";
+        ctx.fillText((i+1) + "º", padX + 20, meioY + 8);
+        ctx.textAlign = "left";
+
+        var corFicha = CORES[i % CORES.length];
+        ctx.fillStyle = corFicha;
+        ctx.beginPath();
+        ctx.arc(padX + 66, meioY, 15, 0, Math.PI*2);
+        ctx.fill();
+        ctx.fillStyle = "rgba(255,255,255,.55)";
+        ctx.beginPath();
+        ctx.arc(padX + 66, meioY, 6, 0, Math.PI*2);
+        ctx.fill();
+
+        ctx.fillStyle = PAL.texto;
+        ctx.font = "600 19px Archivo, sans-serif";
+        ctx.fillText(x.nome, padX + 96, meioY - 4);
+
+        ctx.fillStyle = PAL.apagado;
+        ctx.font = "400 13px Archivo, sans-serif";
+        var linha2 = x.noites + (Number(x.noites) === 1 ? " noite" : " noites") + " · média " + R(x.media);
+        ctx.fillText(linha2, padX + 96, meioY + 18);
+
+        var saldo = arredonda(x.saldo);
+        ctx.fillStyle = saldo > 0 ? tokenCor("--up","#4FBE8B") : (saldo < 0 ? tokenCor("--down","#E5645C") : PAL.apagado);
+        ctx.font = "700 21px \"IBM Plex Mono\", monospace";
+        ctx.textAlign = "right";
+        ctx.fillText(sinal(saldo), W - padX, meioY + 7);
+        ctx.textAlign = "left";
+      });
+
+      // rodape
+      var yFoot = headerH + lista.length * rowH + footH/2;
+      ctx.strokeStyle = PAL.linha;
+      ctx.beginPath();
+      ctx.moveTo(padX, headerH + lista.length * rowH + 14);
+      ctx.lineTo(W - padX, headerH + lista.length * rowH + 14);
+      ctx.stroke();
+
+      ctx.fillStyle = PAL.fraco;
+      ctx.font = "600 12px Archivo, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("F I C H A S   N A   M E S A   ·   P S E P U L V I D A . G I T H U B . I O / F I C H A S - N A - M E S A", W/2, yFoot + 4);
+      ctx.textAlign = "left";
+
+      return new Promise(function(resolve){
+        canvas.toBlob(function(blob){ resolve(blob); }, "image/png", 0.95);
+      });
+    });
+  }
+
+  function compartilharRanking(){
+    if(!ultimoRanking.length){
+      avisarErro("Ainda não há ranking para compartilhar.");
+      return;
+    }
+    var btn = $("btnCompartilharRanking");
+    var textoOriginal = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Gerando imagem…";
+
+    gerarImagemRanking(ultimoRanking).then(function(blob){
+      var arquivo = new File([blob], "ranking-fichas-na-mesa.png", { type: "image/png" });
+
+      if(navigator.canShare && navigator.canShare({ files: [arquivo] })){
+        return navigator.share({
+          files: [arquivo],
+          title: "Ranking - Fichas na Mesa",
+          text: "Ranking do grupo no Fichas na Mesa"
+        }).catch(function(e){
+          if(e && e.name === "AbortError") return; // usuário cancelou o compartilhamento
+          throw e;
+        });
+      }
+
+      var url = URL.createObjectURL(blob);
+      var novaAba = window.open(url, "_blank");
+      if(!novaAba){
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = "ranking-fichas-na-mesa.png";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+      toast("Imagem gerada — salve ou compartilhe no WhatsApp");
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
+    }).catch(function(e){
+      avisarErro("Não deu para gerar a imagem: " + (e && e.message ? e.message : "erro desconhecido"));
+    }).then(function(){
+      btn.disabled = !ultimoRanking.length;
+      btn.textContent = textoOriginal;
     });
   }
 
