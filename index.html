@@ -402,12 +402,15 @@
     display:flex; gap:7px;
     overflow-x:auto;
     margin-bottom:14px;
+    scroll-behavior:smooth;
     padding-bottom:4px;
     -webkit-overflow-scrolling:touch;
     scrollbar-width:none;
   }
   .periodos::-webkit-scrollbar{display:none;}
   .periodos .pick{white-space:nowrap; padding:8px 15px;}
+  #periodosAnos{margin-bottom:8px;}
+  #periodosAnos .pick{font-size:var(--fs-base);}
 
   .rank-row{
     display:grid;
@@ -593,6 +596,7 @@
   </div><!-- fim telaPartida -->
 
   <div id="telaRanking" class="hidden">
+    <div class="periodos hidden" id="periodosAnos"></div>
     <div class="periodos hidden" id="periodos"></div>
 
     <div class="table-panel">
@@ -1769,43 +1773,83 @@
     });
   }
 
-  /* ---------------- períodos: o geral e cada mês ---------------- */
+  /* ---------------- períodos: o geral, cada ano e cada mês ----------------
+
+     Com um ano só de histórico, a tira é uma linha: Geral, e os meses em
+     ordem. A partir do segundo ano isso viraria uma fileira sem fim (36
+     chips em três anos), então aparece uma tira de anos em cima e a de
+     meses passa a mostrar só o ano escolhido — no máximo 12, para sempre.
+     ------------------------------------------------------------------- */
   var rankingGeral = [], rankingMensal = [], noitesTodas = [];
-  var periodoAtual = "geral";   // "geral" ou "AAAA-MM"
+  var periodoAtual = "geral";   // "geral" | "AAAA" | "AAAA-MM"
 
   var MESES = ["janeiro","fevereiro","março","abril","maio","junho",
                "julho","agosto","setembro","outubro","novembro","dezembro"];
 
+  function nomeMes(n){ return MESES[Number(n) - 1] || "?"; }
   function mesCurto(mes){
     var p = mes.split("-");
-    return MESES[Number(p[1]) - 1].slice(0,3) + "/" + p[0].slice(2);
+    return nomeMes(p[1]).slice(0,3) + "/" + p[0].slice(2);
   }
   function mesLongo(mes){
     var p = mes.split("-");
-    return MESES[Number(p[1]) - 1] + " de " + p[0];
+    return nomeMes(p[1]) + " de " + p[0];
+  }
+  // Como o período aparece no painel e no título da imagem.
+  function rotuloPeriodo(p){
+    if(!p) return null;
+    return (p.length === 4) ? p : mesLongo(p);
   }
 
-  function montarPeriodos(){
-    var caixa = $("periodos");
-    caixa.innerHTML = "";
-
+  function mesesArquivados(){
     var meses = [];
     rankingMensal.forEach(function(x){
       if(meses.indexOf(x.mes) === -1) meses.push(x.mes);
     });
-    meses.sort().reverse();
+    return meses.sort();          // do mais antigo para o mais novo
+  }
 
-    // Sem mês nenhum arquivado, a tira só ocuparia espaço.
-    caixa.classList.toggle("hidden", meses.length === 0);
-    if(!meses.length){ periodoAtual = "geral"; return; }
+  function anosArquivados(meses){
+    var anos = [];
+    meses.forEach(function(m){
+      var a = m.slice(0,4);
+      if(anos.indexOf(a) === -1) anos.push(a);
+    });
+    return anos.sort();
+  }
 
-    // O mês selecionado pode ter sumido (noite apagada, por exemplo).
-    if(periodoAtual !== "geral" && meses.indexOf(periodoAtual) === -1) periodoAtual = "geral";
+  // O mês atual é o mais consultado e, em ordem cronológica, fica no fim da
+  // tira: leva a rolagem até ele sem mexer na rolagem vertical da página.
+  function rolarAteSelecionado(caixa){
+    var sel = caixa.querySelector('.pick[aria-pressed="true"]');
+    if(!sel) return;
+    caixa.scrollLeft = Math.max(0, sel.offsetLeft - (caixa.clientWidth - sel.offsetWidth) / 2);
+  }
 
-    function chip(valor, rotulo){
+  function montarPeriodos(){
+    var linhaAnos  = $("periodosAnos");
+    var linhaMeses = $("periodos");
+    linhaAnos.innerHTML = "";
+    linhaMeses.innerHTML = "";
+
+    var meses = mesesArquivados();
+    var anos  = anosArquivados(meses);
+
+    if(!meses.length){
+      linhaAnos.classList.add("hidden");
+      linhaMeses.classList.add("hidden");
+      periodoAtual = "geral";
+      return;
+    }
+
+    // O período escolhido pode ter sumido — uma noite apagada, por exemplo.
+    if(periodoAtual.length === 7 && meses.indexOf(periodoAtual) === -1) periodoAtual = "geral";
+    if(periodoAtual.length === 4 && anos.indexOf(periodoAtual)  === -1) periodoAtual = "geral";
+
+    function chip(caixa, valor, rotulo, ativo){
       var b = el("button","pick", rotulo);
       b.type = "button";
-      b.setAttribute("aria-pressed", String(periodoAtual === valor));
+      b.setAttribute("aria-pressed", String(ativo === undefined ? (periodoAtual === valor) : ativo));
       b.addEventListener("click", function(){
         periodoAtual = valor;
         montarPeriodos();
@@ -1814,8 +1858,66 @@
       caixa.appendChild(b);
     }
 
-    chip("geral", "Geral");
-    meses.forEach(function(m){ chip(m, mesCurto(m)); });
+    if(anos.length < 2){
+      // Um ano só: tudo numa linha, como sempre foi.
+      linhaAnos.classList.add("hidden");
+      linhaMeses.classList.remove("hidden");
+      chip(linhaMeses, "geral", "Geral");
+      meses.forEach(function(m){ chip(linhaMeses, m, mesCurto(m)); });
+      rolarAteSelecionado(linhaMeses);
+      return;
+    }
+
+    // Dois níveis: anos em cima, meses do ano escolhido embaixo.
+    var anoAberto = (periodoAtual.length === 4) ? periodoAtual
+                  : (periodoAtual.length === 7) ? periodoAtual.slice(0,4)
+                  : null;
+
+    linhaAnos.classList.remove("hidden");
+    chip(linhaAnos, "geral", "Geral");
+    anos.forEach(function(a){ chip(linhaAnos, a, a, anoAberto === a); });
+
+    if(!anoAberto){
+      linhaMeses.classList.add("hidden");
+      rolarAteSelecionado(linhaAnos);
+      return;
+    }
+
+    linhaMeses.classList.remove("hidden");
+    chip(linhaMeses, anoAberto, "Ano todo");
+    meses.filter(function(m){ return m.slice(0,4) === anoAberto; })
+         .forEach(function(m){ chip(linhaMeses, m, nomeMes(m.split("-")[1]).slice(0,3)); });
+
+    rolarAteSelecionado(linhaAnos);
+    rolarAteSelecionado(linhaMeses);
+  }
+
+  // Um ano é a soma dos seus meses. Média não se soma: é o saldo total
+  // dividido pelo total de noites, senão quem jogou mais pesa igual a quem
+  // apareceu uma vez.
+  function juntarMeses(linhas){
+    var porJogador = {};
+    linhas.forEach(function(x){
+      var a = porJogador[x.id];
+      if(!a){
+        a = porJogador[x.id] = {
+          id: x.id, nome: x.nome, pix: x.pix,
+          noites: 0, saldo: 0, melhor: null, pior: null, total_investido: 0
+        };
+      }
+      a.noites += Number(x.noites);
+      a.saldo  += Number(x.saldo);
+      a.total_investido += Number(x.total_investido);
+      a.melhor = (a.melhor === null) ? Number(x.melhor) : Math.max(a.melhor, Number(x.melhor));
+      a.pior   = (a.pior   === null) ? Number(x.pior)   : Math.min(a.pior,   Number(x.pior));
+    });
+
+    return Object.keys(porJogador).map(function(k){
+      var a = porJogador[k];
+      a.saldo = arredonda(a.saldo);
+      a.media = a.noites ? arredonda(a.saldo / a.noites) : 0;
+      return a;
+    });
   }
 
   function desenharPeriodo(){
@@ -1823,9 +1925,16 @@
       desenharRanking(rankingGeral, noitesTodas, null);
       return;
     }
-    var lista = rankingMensal.filter(function(x){ return x.mes === periodoAtual; });
-    var noites = noitesTodas.filter(function(n){ return String(n.data).slice(0,7) === periodoAtual; });
-    desenharRanking(lista, noites, periodoAtual);
+
+    var ehAno  = (periodoAtual.length === 4);
+    var linhas = rankingMensal.filter(function(x){
+      return ehAno ? (x.mes.slice(0,4) === periodoAtual) : (x.mes === periodoAtual);
+    });
+    var noites = noitesTodas.filter(function(n){
+      return String(n.data).slice(0, ehAno ? 4 : 7) === periodoAtual;
+    });
+
+    desenharRanking(ehAno ? juntarMeses(linhas) : linhas, noites, periodoAtual);
   }
 
   var ultimoRanking = [], ultimoPeriodo = null;
@@ -1837,25 +1946,25 @@
     ultimoPeriodo = mes;
     $("btnCompartilharRanking").disabled = !comNoites.length;
     $("btnCompartilharRanking").textContent = mes
-      ? "Compartilhar " + mesCurto(mes).replace("/", "/")
+      ? ("Compartilhar " + (mes.length === 4 ? mes : mesCurto(mes)))
       : "Compartilhar ranking";
 
     document.querySelector("#telaRanking .table-panel .eyebrow").textContent =
-      mes ? ("Quem está na frente em " + mesLongo(mes)) : "Quem está na frente";
+      mes ? ("Quem está na frente em " + rotuloPeriodo(mes)) : "Quem está na frente";
 
     $("rankNoites").textContent = String(noites.length);
     $("rankJogadores").textContent = String(comNoites.length);
     $("rankLider").textContent = comNoites.length ? sinal(comNoites[0].saldo) : "—";
     $("rankLider").className = "table-total money " + (comNoites.length ? classeValor(comNoites[0].saldo) : "");
     $("rankLiderNome").textContent = comNoites.length
-      ? (comNoites[0].nome + (mes ? " lidera o mês" : " lidera o acumulado"))
-      : (mes ? "Nenhuma noite neste mês" : "Nenhuma noite arquivada ainda");
+      ? (comNoites[0].nome + (mes ? (mes.length === 4 ? " lidera o ano" : " lidera o mês") : " lidera o acumulado"))
+      : (mes ? "Nenhuma noite neste período" : "Nenhuma noite arquivada ainda");
 
     var caixa = $("cardRanking");
     caixa.innerHTML = "";
     if(!comNoites.length){
       caixa.appendChild(el("div","p-line", mes
-        ? ("Nenhuma noite arquivada em " + mesLongo(mes) + ".")
+        ? ("Nenhuma noite arquivada em " + rotuloPeriodo(mes) + ".")
         : "Nenhuma noite arquivada ainda. Feche o caixa de uma partida e toque em “Arquivar no ranking”."));
     }
     comNoites.forEach(function(x, i){
@@ -1969,7 +2078,7 @@
 
       ctx.fillStyle = PAL.texto;
       ctx.font = "700 34px Fraunces, Georgia, serif";
-      var tituloImg = ultimoPeriodo ? ("Ranking de " + mesLongo(ultimoPeriodo)) : "Ranking do grupo";
+      var tituloImg = ultimoPeriodo ? ("Ranking de " + rotuloPeriodo(ultimoPeriodo)) : "Ranking do grupo";
       if(ctx.measureText(tituloImg).width > (W - padX*2)){
         ctx.font = "700 27px Fraunces, Georgia, serif";
       }
