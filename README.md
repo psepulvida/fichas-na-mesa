@@ -48,6 +48,27 @@ com ela, alguém contou errado — e o app avisa antes de qualquer um pagar.
 O acerto final usa um algoritmo guloso: o maior devedor paga o maior credor, o que dá o
 menor número de pagamentos possível.
 
+## Comes e bebes
+
+Conta separada da do jogo, de propósito. Cada compra guarda quem adiantou o
+dinheiro, o valor e quem entra no rateio — várias por noite, de pessoas
+diferentes. O saldo de consumo de cada um é o que adiantou menos a sua cota.
+
+As duas contas **só se encontram no acerto final**, para ninguém ter que
+fazer dois PIX para a mesma pessoa. Em todo o resto elas são independentes:
+o consumo não entra no total em jogo, não mexe no resultado do poker, não
+conta na conferência das fichas e **não vai para o ranking** — `arquivar_noite`
+recebe apenas as linhas do jogo.
+
+Na prática isso vive em duas funções: `linhasDaPartida()` devolve o jogo puro,
+que alimenta o card de resultado e o arquivamento; `linhasCombinadas()` soma o
+consumo e serve só ao acerto. Se você precisar mexer aqui, é essa fronteira
+que não pode ser cruzada.
+
+Um detalhe que parece bobo e não é: R$ 100 entre 3 não divide exato. `ratear()`
+distribui os centavos que sobram, senão o acerto final não fecha em zero e
+alguém sai devendo um centavo que ninguém recebe.
+
 ## A mesa ao vivo
 
 Quem abre o link durante o jogo vê a mesa em andamento, atualizando sozinha:
@@ -100,7 +121,7 @@ quem já é do grupo, e o banco tem um índice único em `lower(nome)`.
 `index.html` tem tudo: HTML, CSS e JavaScript no mesmo arquivo, sem bibliotecas nem build.
 Editou, salvou, atualizou a página — pronto.
 
-Quatro coisas a respeitar:
+Cinco coisas a respeitar:
 
 1. **Não crie tipos separados de transação.** Buy-in, recompra e saída são a mesma operação;
    é isso que mantém a conta correta.
@@ -113,6 +134,8 @@ Quatro coisas a respeitar:
 4. **Cuidado ao mexer em `salvar()`.** Enquanto o celular está acompanhando a
    mesa de outra pessoa, o `S` na tela é daquela mesa, não deste aparelho:
    gravar ali apagaria a partida local de quem está só assistindo.
+5. **Não deixe os comes e bebes vazarem para o ranking.** O que é arquivado
+   sai de `linhasDaPartida()`, nunca de `linhasCombinadas()`.
 
 As cores dos jogadores evitam verde e vermelho de propósito: essas duas ficam reservadas
 para lucro e prejuízo.

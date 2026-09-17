@@ -568,6 +568,15 @@
   </div>
   <div class="players" id="listaJogadores"></div>
 
+  <section id="secConsumo" class="hidden">
+    <div class="section-head">
+      <span class="eyebrow">Comes e bebes</span>
+      <span class="eyebrow" id="totalConsumo"></span>
+    </div>
+    <div class="card" id="listaDespesas"></div>
+    <button class="btn wide ghost" id="btnNovaDespesa" type="button" style="margin-top:8px">+ Registrar compra</button>
+  </section>
+
   <section id="secFechamento" class="hidden">
     <div class="section-head"><span class="eyebrow">Contagem final</span></div>
     <div class="card">
@@ -579,8 +588,12 @@
     <div class="section-head"><span class="eyebrow">Resultado da noite</span></div>
     <div class="card" id="cardResultados"></div>
 
+    <div class="section-head hidden" id="cabecalhoRateio"><span class="eyebrow">Rateio dos comes e bebes</span></div>
+    <div class="card hidden" id="cardConsumo"></div>
+
     <div class="section-head"><span class="eyebrow">Quem paga quem</span></div>
     <div class="card" id="cardAcertos"></div>
+    <p class="sub hidden" id="notaAcertos" style="margin-top:8px">Já inclui o jogo e os comes e bebes, para ser um PIX só.</p>
 
     <div class="share-actions">
       <button class="btn ghost" id="btnCopiar">Copiar resumo</button>
@@ -728,6 +741,38 @@
     <div class="sheet-actions">
       <button class="btn ghost cancelar" type="button">Fechar</button>
       <button class="btn primary" id="okTexto" type="button">Copiar</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- diálogo: comes e bebes -->
+<dialog id="dlgDespesa">
+  <form method="dialog" class="sheet" id="formDespesa">
+    <h2>Registrar compra</h2>
+    <label class="field">
+      <span class="eyebrow">Valor</span>
+      <input type="tel" inputmode="decimal" id="inValorDespesa" class="money-in">
+    </label>
+    <label class="field">
+      <span class="eyebrow">O que foi (opcional)</span>
+      <input type="text" id="inOqueDespesa" autocomplete="off" maxlength="30" placeholder="pizza, cerveja, gelo...">
+    </label>
+    <div class="field">
+      <span class="eyebrow">Quem pagou</span>
+      <div class="picks" id="picksPagou"></div>
+    </div>
+    <div class="field">
+      <div class="section-head" style="margin:0 0 6px">
+        <span class="eyebrow">Quem entra no rateio</span>
+        <button class="btn small ghost" id="btnTodosRateio" type="button">Todos</button>
+      </div>
+      <div class="picks" id="picksParticipantes"></div>
+      <div class="sub" id="previaDespesa" style="margin-top:8px"></div>
+    </div>
+    <div class="err" id="errDespesa"></div>
+    <div class="sheet-actions">
+      <button class="btn ghost cancelar" type="button">Cancelar</button>
+      <button class="btn primary" id="okDespesa" type="button">Registrar</button>
     </div>
   </form>
 </dialog>
@@ -952,7 +997,7 @@
 
   /* ---------------- persistência ---------------- */
   function partidaNova(){
-    return { criada: new Date().toISOString(), buyin: 50, jogadores: [], eventos: [], fichas: {}, fechando: false, seq: 1, arquivada: null };
+    return { criada: new Date().toISOString(), buyin: 50, jogadores: [], eventos: [], fichas: {}, despesas: [], fechando: false, seq: 1, arquivada: null };
   }
   var podeSalvar = true;
   function salvar(){
@@ -1181,6 +1226,7 @@
     });
 
     renderEventos();
+    renderDespesas();
     renderFechamento(c);
     marcarArquivada();
     atualizarBotaoFechar();
@@ -1282,11 +1328,49 @@
         (dif > 0 ? "Alguém contou fichas a mais." : "Alguém contou fichas a menos.");
     }
 
-    var linhas = linhasDaPartida();
-    desenharResultados($("cardResultados"), linhas);
-    desenharAcertos($("cardAcertos"), linhas, function(rec){
+    // O card de cima mostra só o jogo: é ele que vai para o ranking.
+    desenharResultados($("cardResultados"), linhasDaPartida());
+
+    var combinadas = linhasCombinadas();
+    desenharConsumo(combinadas);
+
+    // O acerto é o único lugar onde as duas contas se somam.
+    desenharAcertos($("cardAcertos"), combinadas, function(rec){
       var j = jogador(rec.id);
       if(j) abrirRenomear(j);
+    });
+    $("notaAcertos").classList.toggle("hidden", !temConsumo());
+  }
+
+  function desenharConsumo(combinadas){
+    var mostrar = temConsumo();
+    $("cabecalhoRateio").classList.toggle("hidden", !mostrar);
+    $("cardConsumo").classList.toggle("hidden", !mostrar);
+    if(!mostrar) return;
+
+    var caixa = $("cardConsumo");
+    caixa.innerHTML = "";
+    combinadas.forEach(function(x){
+      if(!x.consumo && !despesas().some(function(d){ return (d.participantes||[]).indexOf(x.id) !== -1 || d.pagou === x.id; })) return;
+
+      var row = el("div","result-row");
+      row.appendChild(fichaDaLinha(x));
+
+      var pagou = 0, deve = 0;
+      despesas().forEach(function(d){
+        if(d.pagou === x.id) pagou += d.valor;
+        deve += quotaNaDespesa(d, x.id);
+      });
+
+      var meio = el("div");
+      meio.appendChild(el("div", null, x.nome));
+      var d2 = el("div","p-line");
+      d2.textContent = "Consumiu " + R(deve) + (pagou ? " · adiantou " + R(pagou) : "");
+      meio.appendChild(d2);
+      row.appendChild(meio);
+
+      row.appendChild(el("div","result-v money " + classeValor(x.consumo), sinal(x.consumo)));
+      caixa.appendChild(row);
     });
   }
 
@@ -1532,6 +1616,13 @@
         function(){
           S.jogadores = S.jogadores.filter(function(x){ return x.id !== j.id; });
           S.eventos = S.eventos.filter(function(e){ return e.de !== j.id && e.para !== j.id; });
+          S.despesas = despesas()
+            .filter(function(d){ return d.pagou !== j.id; })
+            .map(function(d){
+              d.participantes = (d.participantes || []).filter(function(id){ return id !== j.id; });
+              return d;
+            })
+            .filter(function(d){ return d.participantes.length > 0; });
           delete S.fichas[j.id];
           assinaturaContagem = "";
           render();
@@ -1552,7 +1643,8 @@
       linhasDaPartida(),
       Math.abs(dif) >= 0.005
         ? ("⚠ Atenção: a contagem das fichas não fechou (diferença de " + R(Math.abs(dif)) + ").")
-        : null
+        : null,
+      temConsumo() ? linhasCombinadas() : null
     );
   }
 
@@ -1594,6 +1686,7 @@
     copiar(resumoTexto(), "Resumo copiado");
   });
   $("btnArquivar").addEventListener("click", function(){ arquivarNoite(false); });
+  $("btnNovaDespesa").addEventListener("click", abrirDespesa);
   $("btnAtualizarRanking").addEventListener("click", function(){ carregarRanking(); });
   $("btnCompartilharRanking").addEventListener("click", compartilharRanking);
   $("btnWhatsApp").addEventListener("click", function(){
@@ -1658,7 +1751,7 @@
   });
 
   // Cancelar fecha; Enter em qualquer campo confirma (nunca cancela).
-  [["formJogador","okJogador"],["formCompra","okCompra"],["formSaida","okSaida"],["formTexto","okTexto"],["formRenomear","okRenomear"],["formSenha","okSenha"]].forEach(function(par){
+  [["formJogador","okJogador"],["formCompra","okCompra"],["formSaida","okSaida"],["formTexto","okTexto"],["formRenomear","okRenomear"],["formSenha","okSenha"],["formDespesa","okDespesa"]].forEach(function(par){
     var f = $(par[0]);
     if(!f) return;
     f.addEventListener("submit", function(ev){
@@ -1674,7 +1767,7 @@
   });
 
   // fechar diálogo tocando fora do painel
-  ["dlgJogador","dlgCompra","dlgSaida","dlgTexto","dlgConfirma","dlgMenu","dlgRenomear","dlgSenha","dlgNoite","dlgAssumir"].forEach(function(id){
+  ["dlgJogador","dlgCompra","dlgSaida","dlgTexto","dlgConfirma","dlgMenu","dlgRenomear","dlgSenha","dlgNoite","dlgAssumir","dlgDespesa"].forEach(function(id){
     var d = $(id);
     d.addEventListener("click", function(ev){
       if(ev.target === d) fecharDialogo(d);
@@ -2187,6 +2280,203 @@
     });
   }
 
+  /* =====================================================================
+     Comes e bebes
+
+     Conta separada da do jogo, de propósito. O consumo não entra no total
+     em jogo, não mexe no resultado do poker e não vai para o ranking — as
+     duas contas só se encontram no acerto final, para ninguém precisar
+     fazer dois PIX para a mesma pessoa.
+     ===================================================================== */
+
+  // R$ 100 entre 3 não dá divisão exata. Sem espalhar o centavo que sobra,
+  // o rateio não fecha em zero e o acerto final fica devendo um centavo.
+  function ratear(valor, quantos){
+    var total  = Math.round(arredonda(valor) * 100);
+    var base   = Math.floor(total / quantos);
+    var sobra  = total - base * quantos;
+    var cotas  = [];
+    for(var i = 0; i < quantos; i++){
+      cotas.push((base + (i < sobra ? 1 : 0)) / 100);
+    }
+    return cotas;
+  }
+
+  function despesas(){
+    if(!S.despesas) S.despesas = [];
+    return S.despesas;
+  }
+
+  // Quem pagou fica credor do que adiantou; quem participou deve a sua cota.
+  function calcularConsumo(){
+    var saldo = {}, total = 0;
+    S.jogadores.forEach(function(j){ saldo[j.id] = 0; });
+
+    despesas().forEach(function(d){
+      var quem = (d.participantes || []).filter(function(id){ return saldo[id] !== undefined; });
+      if(!quem.length || saldo[d.pagou] === undefined) return;
+
+      total += d.valor;
+      saldo[d.pagou] = arredonda(saldo[d.pagou] + d.valor);
+
+      var cotas = ratear(d.valor, quem.length);
+      quem.forEach(function(id, i){ saldo[id] = arredonda(saldo[id] - cotas[i]); });
+    });
+
+    return { saldo: saldo, total: arredonda(total) };
+  }
+
+  function quotaNaDespesa(d, jogadorId){
+    var quem = (d.participantes || []).filter(function(id){ return jogador(id); });
+    var i = quem.indexOf(jogadorId);
+    if(i === -1) return 0;
+    return ratear(d.valor, quem.length)[i];
+  }
+
+  // As linhas do poker, com o consumo somado. É só aqui que as duas contas
+  // se juntam: o resultado do jogo continua intocado para o ranking.
+  function linhasCombinadas(){
+    var consumo = calcularConsumo().saldo;
+    return linhasDaPartida().map(function(x){
+      var c = consumo[x.id] || 0;
+      return {
+        id: x.id, nome: x.nome, pix: x.pix, cor: x.cor,
+        investido: x.investido, credito: x.credito, fichas: x.fichas,
+        resultadoJogo: x.resultado,
+        consumo: c,
+        resultado: arredonda(x.resultado + c)
+      };
+    });
+  }
+
+  function temConsumo(){ return despesas().length > 0; }
+
+  /* ---- a lista de compras na tela da partida ---- */
+  function renderDespesas(){
+    var sec = $("secConsumo");
+    var caixa = $("listaDespesas");
+    if(!sec) return;
+
+    var lista = despesas();
+    sec.classList.toggle("hidden", !S.jogadores.length);
+    caixa.innerHTML = "";
+
+    if(!lista.length){
+      caixa.appendChild(el("div","p-line","Nada comprado ainda."));
+      $("totalConsumo").textContent = "";
+      return;
+    }
+
+    var c = calcularConsumo();
+    $("totalConsumo").textContent = "Total: " + R(c.total);
+
+    lista.forEach(function(d){
+      var row = el("div","ev");
+      row.appendChild(fichaEl(d.pagou, true));
+
+      var t = el("div","txt");
+      var quem = (d.participantes || []).filter(function(id){ return jogador(id); });
+      t.innerHTML = "<b>" + esc(nomeDe(d.pagou)) + "</b> pagou " + R(d.valor) +
+        (d.oque ? " · " + esc(d.oque) : "") +
+        "<br><span class='p-line'>rateado entre " + quem.length +
+        (quem.length === 1 ? " pessoa" : " pessoas") + " · " + R(ratear(d.valor, Math.max(quem.length,1))[0]) + " cada</span>";
+      row.appendChild(t);
+
+      var del = el("button","btn icon","×");
+      del.type = "button";
+      del.setAttribute("aria-label","Apagar esta compra");
+      del.addEventListener("click", function(){
+        confirmar("Apagar esta compra?",
+          nomeDe(d.pagou) + " pagou " + R(d.valor) + (d.oque ? " (" + d.oque + ")" : "") + ".",
+          "Apagar", true, function(){
+            S.despesas = despesas().filter(function(x){ return x.id !== d.id; });
+            render();
+            toast("Compra apagada");
+          });
+      });
+      row.appendChild(del);
+      caixa.appendChild(row);
+    });
+  }
+
+  /* ---- registrar uma compra ---- */
+  var despPagou = null, despQuem = [];
+
+  function abrirDespesa(){
+    if(!S.jogadores.length){ toast("Adicione os jogadores primeiro"); return; }
+    despPagou = null;
+    despQuem = S.jogadores.map(function(j){ return j.id; });   // por padrão, todos
+    $("inValorDespesa").value = "";
+    $("inOqueDespesa").value = "";
+    $("errDespesa").textContent = "";
+    desenharPicksDespesa();
+    abrirDialogo($("dlgDespesa"));
+    setTimeout(function(){ $("inValorDespesa").focus(); }, 60);
+  }
+
+  function desenharPicksDespesa(){
+    montarPicks($("picksPagou"), opcoesJogadores(false, null, true), despPagou, function(id){
+      despPagou = id;
+      desenharPicksDespesa();
+    });
+
+    var caixa = $("picksParticipantes");
+    caixa.innerHTML = "";
+    S.jogadores.forEach(function(j){
+      var b = el("button","pick");
+      b.type = "button";
+      b.setAttribute("aria-pressed", String(despQuem.indexOf(j.id) !== -1));
+      b.appendChild(fichaEl(j.id, true));
+      b.appendChild(document.createTextNode(j.nome));
+      b.addEventListener("click", function(){
+        var i = despQuem.indexOf(j.id);
+        if(i === -1) despQuem.push(j.id); else despQuem.splice(i, 1);
+        desenharPicksDespesa();
+      });
+      caixa.appendChild(b);
+    });
+
+    var todos = (despQuem.length === S.jogadores.length);
+    $("btnTodosRateio").textContent = todos ? "Limpar" : "Todos";
+    atualizarPreviaDespesa();
+  }
+
+  function atualizarPreviaDespesa(){
+    var v = parseMoney($("inValorDespesa").value);
+    var n = despQuem.length;
+    var p = $("previaDespesa");
+    if(isNaN(v) || v <= 0 || !n){ p.textContent = ""; return; }
+    var cotas = ratear(v, n);
+    p.textContent = "Dá " + R(cotas[0]) + " para cada um dos " + n +
+      (cotas[0] !== cotas[cotas.length-1] ? " (um deles paga " + R(cotas[0]) + " e o resto " + R(cotas[n-1]) + ")" : "");
+  }
+
+  $("btnTodosRateio").addEventListener("click", function(){
+    despQuem = (despQuem.length === S.jogadores.length) ? [] : S.jogadores.map(function(j){ return j.id; });
+    desenharPicksDespesa();
+  });
+
+  $("inValorDespesa").addEventListener("input", atualizarPreviaDespesa);
+
+  $("okDespesa").addEventListener("click", function(){
+    var err = $("errDespesa");
+    var valor = parseMoney($("inValorDespesa").value);
+    if(!despPagou){ err.textContent = "Escolha quem pagou."; return; }
+    if(isNaN(valor) || valor <= 0){ err.textContent = "Informe o valor da compra."; return; }
+    if(!despQuem.length){ err.textContent = "Escolha quem entra no rateio."; return; }
+
+    despesas().push({
+      id: "d" + (S.seq++),
+      pagou: despPagou,
+      valor: valor,
+      participantes: despQuem.slice(),
+      oque: $("inOqueDespesa").value.trim()
+    });
+    fecharDialogo($("dlgDespesa"));
+    render();
+    toast(nomeDe(despPagou) + " pagou " + R(valor));
+  });
+
   /* ---------------- resumo de uma noite ----------------
 
      A mesma dupla de blocos — resultado e quem paga quem — serve para a
@@ -2268,9 +2558,12 @@
     });
   }
 
-  function textoDoResumo(dataTxt, totalMesa, linhas, aviso){
+  // combinadas: quando a noite teve comes e bebes, é sobre elas que o acerto
+  // é calculado — o bloco RESULTADO continua sendo só o do jogo.
+  function textoDoResumo(dataTxt, totalMesa, linhas, aviso, combinadas){
+    var paraAcerto = combinadas || linhas;
     var porId = {};
-    linhas.forEach(function(x){ porId[x.id] = x; });
+    paraAcerto.forEach(function(x){ porId[x.id] = x; });
 
     var L = [];
     L.push("♠ CASH GAME — " + dataTxt);
@@ -2283,9 +2576,23 @@
         ", terminou com " + R(x.fichas) + ")");
     });
 
-    var pg = acertos(linhas);
+    if(combinadas){
+      L.push("");
+      L.push("COMES E BEBES");
+      despesas().forEach(function(d){
+        var quem = (d.participantes || []).filter(function(id){ return jogador(id); });
+        L.push("• " + nomeDe(d.pagou) + " pagou " + R(d.valor) +
+               (d.oque ? " (" + d.oque + ")" : "") + " — rateado entre " + quem.length);
+      });
+      combinadas.forEach(function(x){
+        if(Math.abs(x.consumo) < 0.005) return;
+        L.push("  " + x.nome + ": " + sinal(x.consumo));
+      });
+    }
+
+    var pg = acertos(paraAcerto);
     L.push("");
-    L.push("ACERTO DAS CONTAS");
+    L.push(combinadas ? "ACERTO DAS CONTAS (jogo + comes e bebes)" : "ACERTO DAS CONTAS");
     if(!pg.length){ L.push("• Ninguém deve nada a ninguém."); }
     pg.forEach(function(p){
       var de  = porId[p.de]  || { nome:"?" };
@@ -2830,6 +3137,7 @@
   if(!S.fichas) S.fichas = {};
   if(!S.seq) S.seq = 1000;
   if(S.arquivada === undefined) S.arquivada = null;
+  if(!S.despesas) S.despesas = [];
   carregarGrupoLocal();
   atualizarGrupo().catch(function(){ /* sem internet: usa o cache local */ });
   $("buyinPadrao").value = String(S.buyin || 50).replace(".",",");
