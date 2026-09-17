@@ -420,6 +420,58 @@
   .rank-nome{font-weight:600; line-height:1.2;}
   .rank-saldo{font-size:var(--fs-lead); font-weight:600;}
 
+  /* faixa de estado da mesa: só neste celular / ao vivo / acompanhando */
+  .mesa-estado{
+    display:flex; align-items:center; gap:12px;
+    border:1px solid var(--line-soft);
+    background:var(--surface);
+    border-radius:var(--radius);
+    padding:12px 14px;
+    margin-bottom:12px;
+  }
+  .mesa-estado .texto{flex:1; min-width:0;}
+  .mesa-estado button{flex:0 0 auto;}
+  .mesa-estado .titulo{
+    font-size:var(--fs-small); font-weight:600; line-height:1.25;
+    display:flex; align-items:center; gap:7px;
+  }
+  .mesa-estado .detalhe{
+    font-size:var(--fs-micro); color:var(--muted); margin-top:3px; line-height:1.35;
+  }
+  .mesa-estado.ao-vivo{
+    border-color:rgba(79,190,139,.4);
+    background:rgba(79,190,139,.07);
+  }
+  .mesa-estado.ao-vivo .titulo{color:var(--up);}
+  .mesa-estado.lendo{
+    border-color:var(--brass-dim);
+    background:rgba(214,169,78,.08);
+  }
+  .mesa-estado.lendo .titulo{color:var(--brass);}
+
+  .pulso{
+    width:8px; height:8px; border-radius:50%;
+    background:currentColor;
+    flex:0 0 auto;
+    animation:pulsar 2s ease-in-out infinite;
+  }
+  @keyframes pulsar{
+    0%,100%{opacity:1; transform:scale(1);}
+    50%{opacity:.35; transform:scale(.8);}
+  }
+  @media (prefers-reduced-motion:reduce){ .pulso{animation:none;} }
+
+  /* quem está só acompanhando não lança nada */
+  body.acompanhando .actionbar,
+  body.acompanhando .p-actions,
+  body.acompanhando #btnArquivar,
+  body.acompanhando #ajudaArquivar,
+  body.acompanhando #listaContagem input,
+  body.acompanhando footer{
+    display:none !important;
+  }
+  body.acompanhando #secFechamento .card .sub{display:none;}
+
   .aviso{
     margin-top:12px;
     border:1px solid var(--brass-dim);
@@ -467,6 +519,15 @@
   </div>
 
   <div id="telaPartida">
+  <div class="mesa-estado" id="mesaEstado">
+    <div class="texto">
+      <div class="titulo" id="mesaEstadoTitulo">Só neste celular</div>
+      <div class="detalhe" id="mesaEstadoDetalhe">Ninguém mais vê esta partida.</div>
+    </div>
+    <button class="btn small ghost hidden" id="btnMesaSair" type="button">Sair</button>
+    <button class="btn small" id="btnMesaAcao" type="button">Transmitir</button>
+  </div>
+
   <div class="table-panel">
     <span class="eyebrow">Fichas em jogo na mesa</span>
     <div class="table-total money" id="totalMesa">R$ 0,00</div>
@@ -670,6 +731,27 @@
   </div>
 </dialog>
 
+<!-- diálogo: assumir o caixa da mesa -->
+<dialog id="dlgAssumir">
+  <form method="dialog" class="sheet" id="formAssumir">
+    <h2 id="tituloAssumir">Assumir o caixa</h2>
+    <p class="sub" id="ajudaAssumir" style="margin-top:0"></p>
+    <label class="field">
+      <span class="eyebrow">Seu nome</span>
+      <input type="text" id="inNomeCaixa" autocomplete="off" maxlength="18" placeholder="para a galera saber quem lança">
+    </label>
+    <label class="field hidden" id="campoSenhaCaixa">
+      <span class="eyebrow">Senha do grupo</span>
+      <input type="password" id="inSenhaCaixa" autocomplete="off" enterkeyhint="done">
+    </label>
+    <div class="err" id="errAssumir"></div>
+    <div class="sheet-actions">
+      <button class="btn ghost cancelar" type="button">Cancelar</button>
+      <button class="btn primary" id="okAssumir" type="button">Assumir</button>
+    </div>
+  </form>
+</dialog>
+
 <!-- diálogo: senha do grupo -->
 <dialog id="dlgSenha">
   <form method="dialog" class="sheet" id="formSenha">
@@ -827,6 +909,10 @@
   }
   var podeSalvar = true;
   function salvar(){
+    // Acompanhando, o S na tela e a mesa de outra pessoa: gravar aqui apagaria
+    // a partida deste celular.
+    if(MODO === "acompanhando") return;
+    agendarSync();
     try{
       localStorage.setItem(CHAVE, JSON.stringify(S));
     }catch(e){
@@ -2006,6 +2092,18 @@
         S.arquivada = noiteId;
         salvar();
         atualizarGrupo();
+
+        // A noite entrou no ranking: a mesa ao vivo cumpriu o papel.
+        if(MODO === "caixa" && tokenCaixa){
+          var tFim = tokenCaixa;
+          tokenCaixa = null;
+          guardarCaixa();
+          MODO = "local";
+          mesaRemota = null;
+          atualizarMesaEstado();
+          chamarBanco("encerrar_mesa", { p_token: tFim }).catch(function(){});
+        }
+
         toast("Noite arquivada no ranking");
         mostrarTela("ranking");
       }).catch(function(e){
@@ -2039,7 +2137,336 @@
     }
   }
 
-  /* ---------------- in\u00edcio ---------------- */
+  /* =====================================================================
+     A mesa ao vivo
+
+     A partida continua morando neste celular e funcionando sem internet.
+     Quando alguém assume o caixa, ela passa a ser espelhada no servidor para
+     os outros acompanharem. O caixa é um posto: quem assume recebe um token
+     novo e invalida o de quem estava antes, então dois celulares nunca lançam
+     em paralelo sem que um deles descubra na hora.
+     ===================================================================== */
+  var CHAVE_CAIXA = "fichas-caixa-v1";
+  var CHAVE_NOME  = "fichas-nome-v1";
+
+  var MODO = "local";        // local | caixa | acompanhando
+  var tokenCaixa = null;
+  var mesaRemota = null;
+  var Sguardado = null;      // a partida deste celular, enquanto acompanho outra
+  var syncPendente = false, syncRodando = false, syncTimer = null;
+  var pollTimer = null, tique = 0;
+
+  // Uma mesa parada há muitas horas é uma noite que acabou sem ninguém
+  // encerrar: não deve continuar aparecendo como se estivesse rolando.
+  var VALIDADE_MESA_MS = 12 * 60 * 60 * 1000;
+
+  function guardarCaixa(){
+    try{
+      if(tokenCaixa) localStorage.setItem(CHAVE_CAIXA, tokenCaixa);
+      else localStorage.removeItem(CHAVE_CAIXA);
+    }catch(e){}
+  }
+  function carregarCaixa(){
+    try{ tokenCaixa = localStorage.getItem(CHAVE_CAIXA) || null; }catch(e){ tokenCaixa = null; }
+  }
+  function nomeGuardado(){
+    try{ return localStorage.getItem(CHAVE_NOME) || ""; }catch(e){ return ""; }
+  }
+  function guardarNome(n){
+    try{ localStorage.setItem(CHAVE_NOME, n); }catch(e){}
+  }
+
+  function mesaViva(m){
+    if(!m || m.encerrada) return false;
+    var t = Date.parse(m.atualizado_em);
+    return isFinite(t) && (Date.now() - t) < VALIDADE_MESA_MS;
+  }
+
+  function lerMesa(){
+    return lerBanco("mesa_publica?select=*&id=eq.1").then(function(lista){
+      mesaRemota = (lista && lista[0]) ? lista[0] : null;
+      return mesaRemota;
+    });
+  }
+
+  /* ---- empurrar o estado (só quem está no caixa) ---- */
+  function agendarSync(){
+    if(MODO !== "caixa") return;
+    syncPendente = true;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(rodarSync, 1200);
+  }
+
+  function rodarSync(){
+    if(MODO !== "caixa" || !tokenCaixa || syncRodando || !syncPendente) return;
+    syncRodando = true;
+    syncPendente = false;
+    chamarBanco("sincronizar_mesa", { p_token: tokenCaixa, p_estado: S })
+      .catch(function(e){
+        if(e && e.message === "NAO_E_O_CAIXA"){
+          perdiOCaixa();
+        }else{
+          // Falha de rede não pode atrapalhar a partida: tenta de novo depois.
+          syncPendente = true;
+        }
+      })
+      .then(function(){ syncRodando = false; });
+  }
+
+  function perdiOCaixa(){
+    tokenCaixa = null;
+    guardarCaixa();
+    MODO = "local";
+    atualizarMesaEstado();
+    lerMesa().then(function(m){
+      atualizarMesaEstado();
+      if(m && m.encerrada){
+        avisarErro("Esta mesa foi encerrada. A partida continua salva neste celular.");
+        return;
+      }
+      var quem = (m && m.caixa_nome) ? m.caixa_nome : "Outra pessoa";
+      confirmar(quem + " assumiu o caixa",
+        "Agora quem lança é " + quem + ". O que você digitou continua salvo neste celular, mas não vai mais para a mesa dos outros.",
+        "Acompanhar ao vivo", false, function(){ entrarAcompanhando(); });
+    }).catch(function(){});
+  }
+
+  /* ---- acompanhar a mesa de outra pessoa ---- */
+  function entrarAcompanhando(){
+    if(MODO === "acompanhando") return;
+    if(!mesaViva(mesaRemota)){ toast("Não há mesa ao vivo agora"); return; }
+    if(MODO === "caixa"){ tokenCaixa = null; guardarCaixa(); }
+    Sguardado = S;
+    MODO = "acompanhando";
+    document.body.classList.add("acompanhando");
+    aplicarMesaRemota();
+    atualizarMesaEstado();
+  }
+
+  function sairAcompanhando(){
+    if(MODO !== "acompanhando") return;
+    MODO = "local";
+    document.body.classList.remove("acompanhando");
+    S = Sguardado || carregar();
+    Sguardado = null;
+    assinaturaContagem = "";
+    render();
+    atualizarMesaEstado();
+  }
+
+  function aplicarMesaRemota(){
+    if(MODO !== "acompanhando" || !mesaRemota) return;
+    var e = mesaRemota.estado;
+    if(!e || !e.jogadores){ e = partidaNova(); }
+    S = e;
+    if(!S.fichas) S.fichas = {};
+    if(!S.eventos) S.eventos = [];
+    assinaturaContagem = "";
+    render();
+  }
+
+  /* ---- assumir o caixa ---- */
+  function abrirAssumir(){
+    lerMesa().then(function(m){
+      var existe = mesaViva(m);
+      $("tituloAssumir").textContent = existe ? "Assumir o caixa" : "Transmitir esta mesa";
+      $("ajudaAssumir").textContent = existe
+        ? "Você passa a ser quem lança, continuando a mesa de " + (m.caixa_nome || "quem está no caixa") +
+          " de onde ela parou. O celular de quem estava no caixa vira somente leitura."
+        : "Os outros vão poder abrir o link e acompanhar esta mesa ao vivo, sem poder mexer.";
+      $("okAssumir").textContent = existe ? "Assumir" : "Transmitir";
+      $("inNomeCaixa").value = nomeGuardado();
+      $("campoSenhaCaixa").classList.toggle("hidden", !!senhaGuardada());
+      $("inSenhaCaixa").value = "";
+      $("errAssumir").textContent = "";
+      abrirDialogo($("dlgAssumir"));
+      setTimeout(function(){ $("inNomeCaixa").focus(); }, 60);
+    }).catch(function(e){ avisarErro(erroLegivel(e)); });
+  }
+
+  $("okAssumir").addEventListener("click", function(){
+    var nome  = $("inNomeCaixa").value.trim();
+    var senha = senhaGuardada() || $("inSenhaCaixa").value.trim();
+    var err   = $("errAssumir");
+    if(!nome){ err.textContent = "Diga seu nome, para a galera saber quem está lançando."; return; }
+    if(!senha){
+      $("campoSenhaCaixa").classList.remove("hidden");
+      err.textContent = "Digite a senha do grupo.";
+      return;
+    }
+
+    var btn = $("okAssumir");
+    var textoBtn = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Aguarde…";
+
+    chamarBanco("assumir_caixa", { p_senha: senha, p_nome: nome }).then(function(r){
+      var remoto = r && r.estado;
+      var remotoTemJogo = !!(remoto && remoto.jogadores && remoto.jogadores.length);
+      var localTemJogo  = !!(MODO !== "acompanhando" && S.jogadores && S.jogadores.length);
+
+      function concluir(usarRemoto){
+        guardarSenha(senha);
+        guardarNome(nome);
+        tokenCaixa = r.token;
+        guardarCaixa();
+
+        if(MODO === "acompanhando"){
+          document.body.classList.remove("acompanhando");
+          Sguardado = null;
+        }
+        MODO = "caixa";
+
+        if(usarRemoto){
+          S = remoto;
+          if(!S.fichas) S.fichas = {};
+          if(!S.eventos) S.eventos = [];
+          if(!S.seq) S.seq = 1000;
+          assinaturaContagem = "";
+          render();
+          toast("Você é o caixa — a mesa continua daqui");
+        }else{
+          render();            // render chama salvar, que agenda o envio
+          syncPendente = true;
+          rodarSync();
+          toast("Transmitindo ao vivo");
+        }
+        lerMesa().then(atualizarMesaEstado).catch(atualizarMesaEstado);
+      }
+
+      fecharDialogo($("dlgAssumir"));
+
+      // Os dois lados com jogo: não decide sozinho qual sobrevive.
+      if(remotoTemJogo && localTemJogo){
+        confirmar("Continuar a mesa do grupo?",
+          "A mesa do grupo tem " + remoto.jogadores.length + " jogador(es) e este celular tem uma partida com " +
+          S.jogadores.length + ". Continuar a do grupo substitui o que está neste celular.",
+          "Continuar a do grupo", false,
+          function(){ concluir(true); });
+        return;
+      }
+      concluir(remotoTemJogo);
+
+    }).catch(function(e){
+      if(e && e.message === "SENHA_INVALIDA"){
+        esquecerSenha();
+        $("campoSenhaCaixa").classList.remove("hidden");
+        err.textContent = "Senha do grupo incorreta.";
+      }else{
+        err.textContent = erroLegivel(e);
+      }
+    }).then(function(){
+      btn.disabled = false;
+      btn.textContent = textoBtn;
+    });
+  });
+
+  function pararDeTransmitir(){
+    confirmar("Parar de transmitir?",
+      "A mesa deixa de aparecer para os outros e a partida continua só neste celular.",
+      "Parar", false, function(){
+        var t = tokenCaixa;
+        tokenCaixa = null;
+        guardarCaixa();
+        MODO = "local";
+        mesaRemota = null;
+        atualizarMesaEstado();
+        if(t) chamarBanco("encerrar_mesa", { p_token: t }).catch(function(){});
+      });
+  }
+
+  /* ---- a faixa que diz em que pé a mesa está ---- */
+  function atualizarMesaEstado(){
+    var caixa   = $("mesaEstado");
+    var titulo  = $("mesaEstadoTitulo");
+    var detalhe = $("mesaEstadoDetalhe");
+    var botao   = $("btnMesaAcao");
+    if(!caixa) return;
+
+    caixa.className = "mesa-estado";
+    titulo.innerHTML = "";
+    $("btnMesaSair").classList.toggle("hidden", MODO !== "acompanhando");
+
+    if(MODO === "caixa"){
+      caixa.classList.add("ao-vivo");
+      titulo.appendChild(el("span","pulso"));
+      titulo.appendChild(document.createTextNode("Você é o caixa · ao vivo"));
+      detalhe.textContent = "Quem abrir o link vê esta mesa atualizando sozinha.";
+      botao.textContent = "Parar";
+      botao.onclick = pararDeTransmitir;
+
+    }else if(MODO === "acompanhando"){
+      caixa.classList.add("lendo");
+      titulo.appendChild(el("span","pulso"));
+      titulo.appendChild(document.createTextNode(
+        "Acompanhando " + ((mesaRemota && mesaRemota.caixa_nome) ? mesaRemota.caixa_nome : "a mesa")));
+      detalhe.textContent = "Somente leitura — atualiza sozinho. Toque em Assumir para virar o caixa.";
+      botao.textContent = "Assumir";
+      botao.onclick = abrirAssumir;
+
+    }else{
+      var temMesa = mesaViva(mesaRemota);
+      titulo.textContent = temMesa ? "Tem mesa rolando agora" : "Só neste celular";
+      detalhe.textContent = temMesa
+        ? ((mesaRemota.caixa_nome || "Alguém") + " está no caixa. Você pode acompanhar ao vivo.")
+        : "Ninguém mais vê esta partida. Transmita para a galera acompanhar.";
+      botao.textContent = temMesa ? "Acompanhar" : "Transmitir";
+      botao.onclick = temMesa ? function(){ entrarAcompanhando(); } : abrirAssumir;
+    }
+  }
+
+  /* ---- relógio: acompanha, mantém a mesa viva e detecta a perda do caixa ---- */
+  function iniciarRelogio(){
+    clearInterval(pollTimer);
+    pollTimer = setInterval(function(){
+      if(document.hidden) return;
+      tique++;
+
+      if(MODO === "acompanhando"){
+        lerMesa().then(function(m){
+          if(!mesaViva(m)){
+            toast("A mesa foi encerrada");
+            sairAcompanhando();
+            return;
+          }
+          aplicarMesaRemota();
+          atualizarMesaEstado();
+        }).catch(function(){});
+        return;
+      }
+
+      if(tique % 4 !== 0) return;   // os outros modos só precisam olhar a cada 20s
+
+      if(MODO === "caixa"){
+        syncPendente = true;        // batida de vida: mantém a mesa fresca e
+        rodarSync();                // descobre se alguém assumiu no lugar
+      }else{
+        lerMesa().then(atualizarMesaEstado).catch(function(){});
+      }
+    }, 5000);
+  }
+
+  $("btnMesaSair").addEventListener("click", function(){
+    var minha = (Sguardado && Sguardado.jogadores && Sguardado.jogadores.length) ? Sguardado.jogadores.length : 0;
+    confirmar("Parar de acompanhar?",
+      minha
+        ? "Você volta para a partida deste celular, que tem " + minha + " jogador(es). A mesa do grupo continua rolando normalmente."
+        : "Você volta para a tela de partida deste celular. A mesa do grupo continua rolando normalmente.",
+      "Sair", false, sairAcompanhando);
+  });
+
+  document.addEventListener("visibilitychange", function(){
+    if(document.hidden) return;
+    if(MODO === "acompanhando"){
+      lerMesa().then(function(){ aplicarMesaRemota(); atualizarMesaEstado(); }).catch(function(){});
+    }else if(MODO === "caixa"){
+      syncPendente = true; rodarSync();
+    }else{
+      lerMesa().then(atualizarMesaEstado).catch(function(){});
+    }
+  });
+
+  /* ---------------- início ---------------- */
   S = carregar();
   if(!S.fichas) S.fichas = {};
   if(!S.seq) S.seq = 1000;
@@ -2047,6 +2474,24 @@
   carregarGrupoLocal();
   atualizarGrupo().catch(function(){ /* sem internet: usa o cache local */ });
   $("buyinPadrao").value = String(S.buyin || 50).replace(".",",");
+
+  carregarCaixa();
+  if(tokenCaixa) MODO = "caixa";
   render();
+  atualizarMesaEstado();
+
+  lerMesa().then(function(m){
+    if(MODO === "caixa"){
+      syncPendente = true;
+      rodarSync();               // confirma que este celular ainda e o caixa
+    }else if(mesaViva(m) && !S.jogadores.length){
+      // Celular sem partida propria e mesa rolando: e o caso do amigo que
+      // abre o link no meio do jogo.
+      entrarAcompanhando();
+    }
+    atualizarMesaEstado();
+  }).catch(function(){ atualizarMesaEstado(); });
+
+  iniciarRelogio();
 })();
 </script>
