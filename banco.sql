@@ -268,6 +268,32 @@ group by j.id, j.nome, j.pix;
 grant select on ranking to anon, authenticated;
 
 
+-- O mesmo ranking, quebrado mês a mês. O app busca todos os meses de uma vez
+-- e troca de período sem ir ao servidor de novo.
+--
+-- Aqui o join parte de "resultados", e não de "jogadores" como na view acima:
+-- num mês só aparece quem realmente jogou naquele mês.
+create or replace view ranking_mensal as
+select
+  to_char(n.data, 'YYYY-MM')               as mes,
+  j.id                                     as id,
+  j.nome                                   as nome,
+  j.pix                                    as pix,
+  count(r.id)                              as noites,
+  coalesce(sum(r.resultado), 0)            as saldo,
+  coalesce(round(avg(r.resultado), 2), 0)  as media,
+  coalesce(max(r.resultado), 0)            as melhor,
+  coalesce(min(r.resultado), 0)            as pior,
+  coalesce(sum(r.investido), 0)            as total_investido
+from resultados r
+join noites    n on n.id = r.noite_id
+join jogadores j on j.id = r.jogador_id
+group by 1, j.id, j.nome, j.pix;
+
+grant select on ranking_mensal to anon, authenticated;
+
+
+
 -- ---------------------------------------------------------------------
 -- 5. A mesa ao vivo (partida em andamento, compartilhada)
 --
