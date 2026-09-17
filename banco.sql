@@ -266,3 +266,145 @@ left join resultados r on r.jogador_id = j.id
 group by j.id, j.nome, j.pix;
 
 grant select on ranking to anon, authenticated;
+
+
+-- ---------------------------------------------------------------------
+-- 5. A mesa ao vivo (partida em andamento, compartilhada)
+--
+-- A partida de hoje deixa de morar só no celular de quem lança. Uma linha
+-- só, sempre a mesma (id = 1), guarda o estado inteiro da mesa atual.
+--
+-- O "caixa" é um posto, não uma pessoa: quem assume recebe um token e é o
+-- único que consegue gravar. Assumir invalida o token de quem estava antes,
+-- o que dá a passagem de bastão e também resolve o caixa cujo celular
+-- descarregou — outra pessoa assume e a noite continua de onde parou.
+-- ---------------------------------------------------------------------
+
+create table if not exists mesa_ao_vivo (
+  id             smallint primary key default 1,
+  estado         jsonb       not null default '{}'::jsonb,
+  token          text        not null,
+  caixa_nome     text,
+  versao         bigint      not null default 1,
+  atualizado_em  timestamptz not null default now(),
+  encerrada      boolean     not null default false,
+  constraint mesa_unica check (id = 1)
+);
+
+alter table mesa_ao_vivo enable row level security;
+
+-- Ninguém lê a tabela direto: o token de quem está no caixa está nela.
+revoke all on mesa_ao_vivo from anon, authenticated;
+
+-- O que todo mundo pode ver da mesa: tudo menos o token.
+create or replace view mesa_publica as
+select id, estado, caixa_nome, versao, atualizado_em, encerrada
+from mesa_ao_vivo;
+
+grant select on mesa_publica to anon, authenticated;
+
+
+-- Assume o caixa da noite. Com a senha do grupo, qualquer um assume — é o
+-- que permite tocar a noite quando quem costuma lançar não está presente.
+-- Devolve o estado atual para quem assumiu continuar de onde parou.
+create or replace function assumir_caixa(p_senha text, p_nome text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_token   text;
+  v_estado  jsonb;
+  v_versao  bigint;
+  v_havia   boolean := false;
+begin
+  if not conferir_senha(p_senha) then
+    raise exception 'SENHA_INVALIDA';
+  end if;
+
+  -- gen_random_uuid() e nativo do Postgres; nao depende da extensao pgcrypto
+  -- estar no search_path, que e onde esse tipo de funcao costuma quebrar.
+  v_token := replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '');
+
+  select true, estado, versao
+    into v_havia, v_estado, v_versao
+  from mesa_ao_vivo
+  where id = 1 and not encerrada;
+
+  if not found then
+    -- Nenhuma mesa aberta: começa uma nova, do zero.
+    insert into mesa_ao_vivo (id, estado, token, caixa_nome, versao, atualizado_em, encerrada)
+    values (1, '{}'::jsonb, v_token, nullif(trim(coalesce(p_nome,'')),''), 1, now(), false)
+    on conflict (id) do update
+      set estado = '{}'::jsonb,
+          token = v_token,
+          caixa_nome = excluded.caixa_nome,
+          versao = 1,
+          atualizado_em = now(),
+          encerrada = false;
+
+    return jsonb_build_object('token', v_token, 'estado', '{}'::jsonb, 'versao', 1, 'assumiu_existente', false);
+  end if;
+
+  -- Mesa em andamento: troca só o dono do caixa, preservando o jogo.
+  update mesa_ao_vivo
+     set token = v_token,
+         caixa_nome = nullif(trim(coalesce(p_nome,'')),''),
+         atualizado_em = now()
+   where id = 1;
+
+  return jsonb_build_object('token', v_token, 'estado', v_estado, 'versao', v_versao, 'assumiu_existente', true);
+end;
+$$;
+
+
+-- Grava o estado da mesa. Só passa quem tem o token do caixa atual.
+create or replace function sincronizar_mesa(p_token text, p_estado jsonb)
+returns bigint
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_versao bigint;
+begin
+  update mesa_ao_vivo
+     set estado = p_estado,
+         versao = versao + 1,
+         atualizado_em = now()
+   where id = 1 and token = p_token and not encerrada
+  returning versao into v_versao;
+
+  if not found then
+    raise exception 'NAO_E_O_CAIXA';
+  end if;
+
+  return v_versao;
+end;
+$$;
+
+
+-- Encerra a mesa da noite (depois de arquivar no ranking, por exemplo).
+create or replace function encerrar_mesa(p_token text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update mesa_ao_vivo
+     set encerrada = true, atualizado_em = now()
+   where id = 1 and token = p_token;
+
+  if not found then
+    raise exception 'NAO_E_O_CAIXA';
+  end if;
+end;
+$$;
+
+
+grant execute on function assumir_caixa(text, text)      to anon, authenticated;
+grant execute on function sincronizar_mesa(text, jsonb)  to anon, authenticated;
+grant execute on function encerrar_mesa(text)            to anon, authenticated;
+
