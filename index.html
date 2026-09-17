@@ -398,6 +398,17 @@
   }
   .aba:focus-visible{outline:2px solid var(--brass); outline-offset:2px;}
 
+  .periodos{
+    display:flex; gap:7px;
+    overflow-x:auto;
+    margin-bottom:14px;
+    padding-bottom:4px;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+  }
+  .periodos::-webkit-scrollbar{display:none;}
+  .periodos .pick{white-space:nowrap; padding:8px 15px;}
+
   .rank-row{
     display:grid;
     grid-template-columns:auto auto 1fr auto;
@@ -582,6 +593,8 @@
   </div><!-- fim telaPartida -->
 
   <div id="telaRanking" class="hidden">
+    <div class="periodos hidden" id="periodos"></div>
+
     <div class="table-panel">
       <span class="eyebrow">Quem está na frente</span>
       <div class="table-total money" id="rankLider">—</div>
@@ -1736,10 +1749,15 @@
 
     Promise.all([
       lerBanco("ranking?select=*&order=saldo.desc"),
-      lerBanco("noites?select=id,data,total_mesa&order=data.desc&limit=30")
+      lerBanco("noites?select=id,data,total_mesa&order=data.desc&limit=200"),
+      lerBanco("ranking_mensal?select=*&order=saldo.desc")
     ]).then(function(res){
       atualizarGrupo();
-      desenharRanking(res[0] || [], res[1] || []);
+      rankingGeral  = res[0] || [];
+      noitesTodas   = res[1] || [];
+      rankingMensal = res[2] || [];
+      montarPeriodos();
+      desenharPeriodo();
     }).catch(function(e){
       caixa.innerHTML = "";
       caixa.appendChild(el("div","check bad", erroLegivel(e)));
@@ -1751,25 +1769,94 @@
     });
   }
 
-  var ultimoRanking = [];
-  function desenharRanking(lista, noites){
+  /* ---------------- períodos: o geral e cada mês ---------------- */
+  var rankingGeral = [], rankingMensal = [], noitesTodas = [];
+  var periodoAtual = "geral";   // "geral" ou "AAAA-MM"
+
+  var MESES = ["janeiro","fevereiro","março","abril","maio","junho",
+               "julho","agosto","setembro","outubro","novembro","dezembro"];
+
+  function mesCurto(mes){
+    var p = mes.split("-");
+    return MESES[Number(p[1]) - 1].slice(0,3) + "/" + p[0].slice(2);
+  }
+  function mesLongo(mes){
+    var p = mes.split("-");
+    return MESES[Number(p[1]) - 1] + " de " + p[0];
+  }
+
+  function montarPeriodos(){
+    var caixa = $("periodos");
+    caixa.innerHTML = "";
+
+    var meses = [];
+    rankingMensal.forEach(function(x){
+      if(meses.indexOf(x.mes) === -1) meses.push(x.mes);
+    });
+    meses.sort().reverse();
+
+    // Sem mês nenhum arquivado, a tira só ocuparia espaço.
+    caixa.classList.toggle("hidden", meses.length === 0);
+    if(!meses.length){ periodoAtual = "geral"; return; }
+
+    // O mês selecionado pode ter sumido (noite apagada, por exemplo).
+    if(periodoAtual !== "geral" && meses.indexOf(periodoAtual) === -1) periodoAtual = "geral";
+
+    function chip(valor, rotulo){
+      var b = el("button","pick", rotulo);
+      b.type = "button";
+      b.setAttribute("aria-pressed", String(periodoAtual === valor));
+      b.addEventListener("click", function(){
+        periodoAtual = valor;
+        montarPeriodos();
+        desenharPeriodo();
+      });
+      caixa.appendChild(b);
+    }
+
+    chip("geral", "Geral");
+    meses.forEach(function(m){ chip(m, mesCurto(m)); });
+  }
+
+  function desenharPeriodo(){
+    if(periodoAtual === "geral"){
+      desenharRanking(rankingGeral, noitesTodas, null);
+      return;
+    }
+    var lista = rankingMensal.filter(function(x){ return x.mes === periodoAtual; });
+    var noites = noitesTodas.filter(function(n){ return String(n.data).slice(0,7) === periodoAtual; });
+    desenharRanking(lista, noites, periodoAtual);
+  }
+
+  var ultimoRanking = [], ultimoPeriodo = null;
+  function desenharRanking(lista, noites, mes){
     // Quem está cadastrado mas nunca fechou uma noite não entra na classificação.
     var comNoites = lista.filter(function(x){ return Number(x.noites) > 0; });
+    comNoites.sort(function(a,b){ return Number(b.saldo) - Number(a.saldo); });
     ultimoRanking = comNoites;
+    ultimoPeriodo = mes;
     $("btnCompartilharRanking").disabled = !comNoites.length;
+    $("btnCompartilharRanking").textContent = mes
+      ? "Compartilhar " + mesCurto(mes).replace("/", "/")
+      : "Compartilhar ranking";
+
+    document.querySelector("#telaRanking .table-panel .eyebrow").textContent =
+      mes ? ("Quem está na frente em " + mesLongo(mes)) : "Quem está na frente";
 
     $("rankNoites").textContent = String(noites.length);
     $("rankJogadores").textContent = String(comNoites.length);
     $("rankLider").textContent = comNoites.length ? sinal(comNoites[0].saldo) : "—";
     $("rankLider").className = "table-total money " + (comNoites.length ? classeValor(comNoites[0].saldo) : "");
     $("rankLiderNome").textContent = comNoites.length
-      ? comNoites[0].nome + " lidera o acumulado"
-      : "Nenhuma noite arquivada ainda";
+      ? (comNoites[0].nome + (mes ? " lidera o mês" : " lidera o acumulado"))
+      : (mes ? "Nenhuma noite neste mês" : "Nenhuma noite arquivada ainda");
 
     var caixa = $("cardRanking");
     caixa.innerHTML = "";
     if(!comNoites.length){
-      caixa.appendChild(el("div","p-line","Nenhuma noite arquivada ainda. Feche o caixa de uma partida e toque em “Arquivar no ranking”."));
+      caixa.appendChild(el("div","p-line", mes
+        ? ("Nenhuma noite arquivada em " + mesLongo(mes) + ".")
+        : "Nenhuma noite arquivada ainda. Feche o caixa de uma partida e toque em “Arquivar no ranking”."));
     }
     comNoites.forEach(function(x, i){
       var row = el("div","rank-row" + (i === 0 ? " lider" : ""));
@@ -1882,7 +1969,11 @@
 
       ctx.fillStyle = PAL.texto;
       ctx.font = "700 34px Fraunces, Georgia, serif";
-      ctx.fillText("Ranking do grupo", padX, 88);
+      var tituloImg = ultimoPeriodo ? ("Ranking de " + mesLongo(ultimoPeriodo)) : "Ranking do grupo";
+      if(ctx.measureText(tituloImg).width > (W - padX*2)){
+        ctx.font = "700 27px Fraunces, Georgia, serif";
+      }
+      ctx.fillText(tituloImg, padX, 88);
 
       var hoje = new Date();
       var dataTxt = String(hoje.getDate()).padStart(2,"0") + "/" +
