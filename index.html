@@ -217,7 +217,7 @@
   }
 
   /* ---------- inputs ---------- */
-  input[type="text"], input[type="tel"], input[type="password"]{
+  input[type="text"], input[type="tel"], input[type="password"], input[type="date"]{
     appearance:none;
     width:100%;
     background:var(--ground);
@@ -233,6 +233,9 @@
     font-family:"IBM Plex Mono", ui-monospace, monospace;
     font-variant-numeric:tabular-nums;
   }
+  .data-noite{margin:18px 0 0;}
+  .data-noite input{font-family:"IBM Plex Mono", ui-monospace, monospace;}
+  body.acompanhando .data-noite{display:none;}
   .buyin-set input[type="tel"]{width:104px; text-align:right; min-height:40px; padding:8px 10px;}
   label.field{display:block; margin-bottom:14px;}
   label.field > .eyebrow{display:block; margin-bottom:6px;}
@@ -405,6 +408,8 @@
   }
   .aba:focus-visible{outline:2px solid var(--brass); outline-offset:2px;}
 
+  .pick.travado{cursor:default;}
+  .pick.travado .tag{margin-left:2px; font-size:10px; padding:0 6px;}
   .periodos{
     display:flex; gap:7px;
     overflow-x:auto;
@@ -492,6 +497,12 @@
     display:none !important;
   }
   body.acompanhando #secFechamento .card .sub{display:none;}
+  body.acompanhando #btnNovaDespesa,
+  body.acompanhando #listaDespesas .btn.icon,
+  body.acompanhando #listaEventos .btn.icon,
+  body.acompanhando .pix-linha button{
+    display:none !important;
+  }
 
   .aviso{
     margin-top:12px;
@@ -502,6 +513,11 @@
     padding:11px 14px;
     font-size:var(--fs-small);
   }
+  .aviso-versao{
+    display:flex; align-items:center; gap:12px;
+    margin:0 0 12px;
+  }
+  .aviso-versao span{flex:1;}
   .empty{
     color:var(--faint); font-size:var(--fs-small);
     text-align:center; padding:26px 10px;
@@ -533,6 +549,11 @@
       <input type="tel" inputmode="decimal" id="buyinPadrao" class="money-in" value="50" aria-label="Valor do buy-in padrão">
     </div>
   </header>
+
+  <div class="aviso aviso-versao hidden" id="avisoVersao">
+    <span>Tem uma versão nova do app. Atualize antes de lançar qualquer coisa.</span>
+    <button class="btn small primary" id="btnAtualizarApp" type="button">Atualizar</button>
+  </div>
 
   <div class="abas" role="tablist">
     <button class="aba" id="abaPartida" type="button" aria-pressed="true">Partida de hoje</button>
@@ -599,8 +620,12 @@
       <button class="btn ghost" id="btnCopiar">Copiar resumo</button>
       <button class="btn ghost" id="btnWhatsApp">Compartilhar no WhatsApp</button>
     </div>
+    <label class="field data-noite">
+      <span class="eyebrow">Data desta noite no ranking</span>
+      <input type="date" id="inDataNoite">
+    </label>
     <button class="btn wide primary" id="btnArquivar" style="margin-top:8px">Arquivar no ranking</button>
-    <p class="sub" id="ajudaArquivar" style="margin-top:8px">Grava o resultado desta noite no ranking do grupo e limpa a mesa para a pr\u00f3xima. Precisa de internet e da senha.</p>
+    <p class="sub" id="ajudaArquivar" style="margin-top:8px">Grava o resultado desta noite no ranking do grupo e limpa a mesa para a próxima. Precisa de internet e da senha.</p>
   </section>
 
   <details id="detHistorico">
@@ -763,11 +788,12 @@
     </div>
     <div class="field">
       <div class="section-head" style="margin:0 0 6px">
-        <span class="eyebrow">Quem entra no rateio</span>
+        <span class="eyebrow">Quem dividiu</span>
         <button class="btn small ghost" id="btnTodosRateio" type="button">Todos</button>
       </div>
       <div class="picks" id="picksParticipantes"></div>
-      <div class="sub" id="previaDespesa" style="margin-top:8px"></div>
+      <div class="sub" style="margin-top:6px">Quem pagou já entra automaticamente.</div>
+      <div class="sub" id="previaDespesa" style="margin-top:6px"></div>
     </div>
     <div class="err" id="errDespesa"></div>
     <div class="sheet-actions">
@@ -1172,11 +1198,28 @@
     });
   }
 
+  /* ---------------- data da noite ---------------- */
+  function isoLocal(d){
+    return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+  }
+  // Corrigida à mão tem prioridade; senão, o dia em que a noite começou.
+  // Um jogo que vira a madrugada continua sendo da noite em que começou.
+  function dataDaNoite(){
+    if(S.dataNoite && /^\d{4}-\d{2}-\d{2}$/.test(S.dataNoite)) return S.dataNoite;
+    return isoLocal(new Date(S.criada));
+  }
+  function dataDaNoiteComoDate(){
+    var p = dataDaNoite().split("-");
+    return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+  }
+
   /* ---------------- render ---------------- */
   function render(){
     var c = calcular();
 
-    $("dataPartida").textContent = new Date(S.criada).toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"});
+    $("dataPartida").textContent = dataDaNoiteComoDate().toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"});
+    var campoData = $("inDataNoite");
+    if(campoData && document.activeElement !== campoData) campoData.value = dataDaNoite();
     $("totalMesa").textContent = R(c.totalMesa);
     $("statJogadores").textContent = String(S.jogadores.filter(function(j){ return !j.fora; }).length);
     $("statCompras").textContent = String(S.eventos.filter(function(e){ return e.de !== null; }).length);
@@ -1351,7 +1394,7 @@
     var caixa = $("cardConsumo");
     caixa.innerHTML = "";
     combinadas.forEach(function(x){
-      if(!x.consumo && !despesas().some(function(d){ return (d.participantes||[]).indexOf(x.id) !== -1 || d.pagou === x.id; })) return;
+      if(!x.consumo && !despesas().some(function(d){ return participantesDe(d).indexOf(x.id) !== -1; })) return;
 
       var row = el("div","result-row");
       row.appendChild(fichaDaLinha(x));
@@ -1461,6 +1504,13 @@
     if(doGrupo){
       nome = doGrupo.nome;
       if(!pix) pix = doGrupo.pix || "";
+    }
+
+    // A noite começa com o primeiro jogador, não quando a partida vazia foi
+    // criada — ela pode ter nascido dias antes, no arquivamento anterior.
+    if(!S.jogadores.length && !S.eventos.length){
+      S.criada = new Date().toISOString();
+      delete S.dataNoite;
     }
 
     var id = novoId();
@@ -1638,7 +1688,7 @@
     var c = calcular();
     var dif = arredonda(somaFichasContadas() - c.totalMesa);
     return textoDoResumo(
-      new Date(S.criada).toLocaleDateString("pt-BR"),
+      dataDaNoiteComoDate().toLocaleDateString("pt-BR"),
       c.totalMesa,
       linhasDaPartida(),
       Math.abs(dif) >= 0.005
@@ -1686,6 +1736,18 @@
     copiar(resumoTexto(), "Resumo copiado");
   });
   $("btnArquivar").addEventListener("click", function(){ arquivarNoite(false); });
+  $("btnAtualizarApp").addEventListener("click", function(){
+    location.replace(location.pathname + "?v=" + Date.now());
+  });
+  $("inDataNoite").addEventListener("change", function(){
+    var v = this.value;
+    if(/^\d{4}-\d{2}-\d{2}$/.test(v)){
+      S.dataNoite = v;
+      render();
+    }else{
+      this.value = dataDaNoite();
+    }
+  });
   $("btnNovaDespesa").addEventListener("click", abrirDespesa);
   $("btnAtualizarRanking").addEventListener("click", function(){ carregarRanking(); });
   $("btnCompartilharRanking").addEventListener("click", compartilharRanking);
@@ -2302,6 +2364,13 @@
     return cotas;
   }
 
+  // Quem pagou sempre divide a própria compra.
+  function participantesDe(d){
+    var lista = (d.participantes || []).slice();
+    if(d.pagou && lista.indexOf(d.pagou) === -1) lista.push(d.pagou);
+    return lista.filter(function(id){ return jogador(id); });
+  }
+
   function despesas(){
     if(!S.despesas) S.despesas = [];
     return S.despesas;
@@ -2313,7 +2382,7 @@
     S.jogadores.forEach(function(j){ saldo[j.id] = 0; });
 
     despesas().forEach(function(d){
-      var quem = (d.participantes || []).filter(function(id){ return saldo[id] !== undefined; });
+      var quem = participantesDe(d).filter(function(id){ return saldo[id] !== undefined; });
       if(!quem.length || saldo[d.pagou] === undefined) return;
 
       total += d.valor;
@@ -2327,7 +2396,7 @@
   }
 
   function quotaNaDespesa(d, jogadorId){
-    var quem = (d.participantes || []).filter(function(id){ return jogador(id); });
+    var quem = participantesDe(d);
     var i = quem.indexOf(jogadorId);
     if(i === -1) return 0;
     return ratear(d.valor, quem.length)[i];
@@ -2375,7 +2444,7 @@
       row.appendChild(fichaEl(d.pagou, true));
 
       var t = el("div","txt");
-      var quem = (d.participantes || []).filter(function(id){ return jogador(id); });
+      var quem = participantesDe(d);
       t.innerHTML = "<b>" + esc(nomeDe(d.pagou)) + "</b> pagou " + R(d.valor) +
         (d.oque ? " · " + esc(d.oque) : "") +
         "<br><span class='p-line'>rateado entre " + quem.length +
@@ -2420,15 +2489,24 @@
       desenharPicksDespesa();
     });
 
+    if(despPagou && despQuem.indexOf(despPagou) === -1) despQuem.push(despPagou);
+
     var caixa = $("picksParticipantes");
     caixa.innerHTML = "";
     S.jogadores.forEach(function(j){
-      var b = el("button","pick");
+      var ehQuemPagou = (j.id === despPagou);
+      var b = el("button","pick" + (ehQuemPagou ? " travado" : ""));
       b.type = "button";
       b.setAttribute("aria-pressed", String(despQuem.indexOf(j.id) !== -1));
       b.appendChild(fichaEl(j.id, true));
       b.appendChild(document.createTextNode(j.nome));
+      if(ehQuemPagou){
+        b.appendChild(el("span","tag","pagou"));
+        b.setAttribute("aria-disabled","true");
+        b.title = "Quem pagou sempre entra no rateio";
+      }
       b.addEventListener("click", function(){
+        if(ehQuemPagou) return;
         var i = despQuem.indexOf(j.id);
         if(i === -1) despQuem.push(j.id); else despQuem.splice(i, 1);
         desenharPicksDespesa();
@@ -2437,7 +2515,7 @@
     });
 
     var todos = (despQuem.length === S.jogadores.length);
-    $("btnTodosRateio").textContent = todos ? "Limpar" : "Todos";
+    $("btnTodosRateio").textContent = todos ? "Só quem pagou" : "Todos";
     atualizarPreviaDespesa();
   }
 
@@ -2446,13 +2524,16 @@
     var n = despQuem.length;
     var p = $("previaDespesa");
     if(isNaN(v) || v <= 0 || !n){ p.textContent = ""; return; }
+    if(n === 1 && despPagou){ p.textContent = "Marque quem mais dividiu esta compra."; return; }
     var cotas = ratear(v, n);
     p.textContent = "Dá " + R(cotas[0]) + " para cada um dos " + n +
       (cotas[0] !== cotas[cotas.length-1] ? " (um deles paga " + R(cotas[0]) + " e o resto " + R(cotas[n-1]) + ")" : "");
   }
 
   $("btnTodosRateio").addEventListener("click", function(){
-    despQuem = (despQuem.length === S.jogadores.length) ? [] : S.jogadores.map(function(j){ return j.id; });
+    despQuem = (despQuem.length === S.jogadores.length)
+      ? (despPagou ? [despPagou] : [])
+      : S.jogadores.map(function(j){ return j.id; });
     desenharPicksDespesa();
   });
 
@@ -2463,7 +2544,9 @@
     var valor = parseMoney($("inValorDespesa").value);
     if(!despPagou){ err.textContent = "Escolha quem pagou."; return; }
     if(isNaN(valor) || valor <= 0){ err.textContent = "Informe o valor da compra."; return; }
-    if(!despQuem.length){ err.textContent = "Escolha quem entra no rateio."; return; }
+    if(despQuem.indexOf(despPagou) === -1) despQuem.push(despPagou);
+    // Uma compra dividida só com quem pagou não gera dívida para ninguém.
+    if(despQuem.length < 2){ err.textContent = "Marque quem mais dividiu esta compra além de quem pagou."; return; }
 
     despesas().push({
       id: "d" + (S.seq++),
@@ -2580,7 +2663,7 @@
       L.push("");
       L.push("COMES E BEBES");
       despesas().forEach(function(d){
-        var quem = (d.participantes || []).filter(function(id){ return jogador(id); });
+        var quem = participantesDe(d);
         L.push("• " + nomeDe(d.pagou) + " pagou " + R(d.valor) +
                (d.oque ? " (" + d.oque + ")" : "") + " — rateado entre " + quem.length);
       });
@@ -2727,10 +2810,7 @@
           };
         });
 
-        var d = new Date(S.criada);
-        var data = d.getFullYear() + "-" +
-                   String(d.getMonth()+1).padStart(2,"0") + "-" +
-                   String(d.getDate()).padStart(2,"0");
+        var data = dataDaNoite();
 
         return chamarBanco("arquivar_noite", {
           p_senha: senha,
@@ -2812,6 +2892,31 @@
      novo e invalida o de quem estava antes, então dois celulares nunca lançam
      em paralelo sem que um deles descubra na hora.
      ===================================================================== */
+  // Suba este número a cada publicação que mude o formato da mesa.
+  var VERSAO_APP = 20260925;
+
+  function estadoMaisNovo(e){
+    return !!(e && Number(e.versaoApp) > VERSAO_APP);
+  }
+
+  function mostrarAvisoVersao(){
+    var a = $("avisoVersao");
+    if(a) a.classList.remove("hidden");
+  }
+
+  var ultimaChecagemVersao = 0;
+  function checarVersaoPublicada(){
+    if(Date.now() - ultimaChecagemVersao < 10 * 60 * 1000) return;
+    ultimaChecagemVersao = Date.now();
+    fetch(location.pathname + "?v=" + Date.now(), { cache: "no-store" })
+      .then(function(r){ return r.ok ? r.text() : ""; })
+      .then(function(txt){
+        var m = /var VERSAO_APP = (\d+);/.exec(txt);
+        if(m && Number(m[1]) > VERSAO_APP) mostrarAvisoVersao();
+      })
+      .catch(function(){ /* sem internet: confere na próxima */ });
+  }
+
   var CHAVE_CAIXA = "fichas-caixa-v1";
   var CHAVE_NOME  = "fichas-nome-v1";
 
@@ -2867,6 +2972,7 @@
     if(MODO !== "caixa" || !tokenCaixa || syncRodando || !syncPendente) return;
     syncRodando = true;
     syncPendente = false;
+    S.versaoApp = VERSAO_APP;
     chamarBanco("sincronizar_mesa", { p_token: tokenCaixa, p_estado: S })
       .catch(function(e){
         if(e && e.message === "NAO_E_O_CAIXA"){
@@ -2923,6 +3029,7 @@
   function aplicarMesaRemota(){
     if(MODO !== "acompanhando" || !mesaRemota) return;
     var e = mesaRemota.estado;
+    if(estadoMaisNovo(e)) mostrarAvisoVersao();
     if(!e || !e.jogadores){ e = partidaNova(); }
     S = e;
     if(!S.fichas) S.fichas = {};
@@ -2961,71 +3068,88 @@
       return;
     }
 
+    var estadoRemoto = mesaViva(mesaRemota) ? mesaRemota.estado : null;
+    if(estadoMaisNovo(estadoRemoto)){
+      err.textContent = "Esta mesa foi aberta numa versão mais nova do app. Atualize a página antes de assumir o caixa.";
+      mostrarAvisoVersao();
+      return;
+    }
+
+    // Os dois lados com jogo: pergunta antes de mexer no servidor, para que
+    // desistir aqui não deixe a mesa sem caixa nenhum.
+    var qtdRemoto = (estadoRemoto && estadoRemoto.jogadores) ? estadoRemoto.jogadores.length : 0;
+    var qtdLocal  = (MODO !== "acompanhando" && S.jogadores) ? S.jogadores.length : 0;
+    if(qtdRemoto && qtdLocal){
+      fecharDialogo($("dlgAssumir"));
+      confirmar("Continuar a mesa do grupo?",
+        "A mesa do grupo tem " + qtdRemoto + " jogador(es) e este celular tem uma partida com " +
+        qtdLocal + ". Continuar a do grupo substitui o que está neste celular.",
+        "Continuar a do grupo", false,
+        function(){ assumirDeFato(nome, senha); });
+      return;
+    }
+    assumirDeFato(nome, senha);
+  });
+
+  function assumirDeFato(nome, senha){
     var btn = $("okAssumir");
+    var err = $("errAssumir");
     var textoBtn = btn.textContent;
     btn.disabled = true;
     btn.textContent = "Aguarde…";
 
+    // Com o diálogo já fechado (veio da confirmação), o erro precisa de outra tela.
+    function mostrarErro(msg){
+      if($("dlgAssumir").open) err.textContent = msg;
+      else avisarErro(msg);
+    }
+
     chamarBanco("assumir_caixa", { p_senha: senha, p_nome: nome }).then(function(r){
       var remoto = r && r.estado;
       var remotoTemJogo = !!(remoto && remoto.jogadores && remoto.jogadores.length);
-      var localTemJogo  = !!(MODO !== "acompanhando" && S.jogadores && S.jogadores.length);
 
-      function concluir(usarRemoto){
-        guardarSenha(senha);
-        guardarNome(nome);
-        tokenCaixa = r.token;
-        guardarCaixa();
+      guardarSenha(senha);
+      guardarNome(nome);
+      tokenCaixa = r.token;
+      guardarCaixa();
 
-        if(MODO === "acompanhando"){
-          document.body.classList.remove("acompanhando");
-          Sguardado = null;
-        }
-        MODO = "caixa";
-
-        if(usarRemoto){
-          S = remoto;
-          if(!S.fichas) S.fichas = {};
-          if(!S.eventos) S.eventos = [];
-          if(!S.seq) S.seq = 1000;
-          assinaturaContagem = "";
-          render();
-          toast("Você é o caixa — a mesa continua daqui");
-        }else{
-          render();            // render chama salvar, que agenda o envio
-          syncPendente = true;
-          rodarSync();
-          toast("Transmitindo ao vivo");
-        }
-        lerMesa().then(atualizarMesaEstado).catch(atualizarMesaEstado);
+      if(MODO === "acompanhando"){
+        document.body.classList.remove("acompanhando");
+        Sguardado = null;
       }
-
+      MODO = "caixa";
       fecharDialogo($("dlgAssumir"));
 
-      // Os dois lados com jogo: não decide sozinho qual sobrevive.
-      if(remotoTemJogo && localTemJogo){
-        confirmar("Continuar a mesa do grupo?",
-          "A mesa do grupo tem " + remoto.jogadores.length + " jogador(es) e este celular tem uma partida com " +
-          S.jogadores.length + ". Continuar a do grupo substitui o que está neste celular.",
-          "Continuar a do grupo", false,
-          function(){ concluir(true); });
-        return;
+      if(remotoTemJogo){
+        S = remoto;
+        if(!S.fichas) S.fichas = {};
+        if(!S.eventos) S.eventos = [];
+        if(!S.despesas) S.despesas = [];
+        if(!S.seq) S.seq = 1000;
+        assinaturaContagem = "";
+        render();
+        toast("Você é o caixa — a mesa continua daqui");
+      }else{
+        render();            // render chama salvar, que agenda o envio
+        syncPendente = true;
+        rodarSync();
+        toast("Transmitindo ao vivo");
       }
-      concluir(remotoTemJogo);
+      lerMesa().then(atualizarMesaEstado).catch(atualizarMesaEstado);
 
     }).catch(function(e){
       if(e && e.message === "SENHA_INVALIDA"){
         esquecerSenha();
         $("campoSenhaCaixa").classList.remove("hidden");
-        err.textContent = "Senha do grupo incorreta.";
+        mostrarErro("Senha do grupo incorreta.");
       }else{
-        err.textContent = erroLegivel(e);
+        mostrarErro(erroLegivel(e));
       }
     }).then(function(){
       btn.disabled = false;
       btn.textContent = textoBtn;
     });
-  });
+  }
 
   function pararDeTransmitir(){
     confirmar("Parar de transmitir?",
@@ -3123,6 +3247,7 @@
 
   document.addEventListener("visibilitychange", function(){
     if(document.hidden) return;
+    checarVersaoPublicada();
     if(MODO === "acompanhando"){
       lerMesa().then(function(){ aplicarMesaRemota(); atualizarMesaEstado(); }).catch(function(){});
     }else if(MODO === "caixa"){
@@ -3160,5 +3285,6 @@
   }).catch(function(){ atualizarMesaEstado(); });
 
   iniciarRelogio();
+  setTimeout(checarVersaoPublicada, 4000);
 })();
 </script>
