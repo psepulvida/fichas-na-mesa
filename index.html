@@ -368,6 +368,7 @@
     font-size:var(--fs-small); color:var(--muted);
   }
   .ev:last-child{border-bottom:none;}
+  #msgConfirma{white-space:pre-line;}
   .ev .txt.abrivel{
     cursor:pointer;
     text-decoration:underline;
@@ -812,8 +813,12 @@
     <div class="section-head" style="margin:16px 0 8px"><span class="eyebrow">Resultado</span></div>
     <div class="card" id="noiteResultados"></div>
 
+    <div class="section-head hidden" style="margin:16px 0 8px" id="cabNoiteConsumo"><span class="eyebrow">Rateio dos comes e bebes</span></div>
+    <div class="card hidden" id="noiteConsumo"></div>
+
     <div class="section-head" style="margin:16px 0 8px"><span class="eyebrow">Quem paga quem</span></div>
     <div class="card" id="noiteAcertos"></div>
+    <p class="sub hidden" id="notaNoiteAcertos" style="margin-top:8px">Já inclui o jogo e os comes e bebes.</p>
 
     <div class="share-actions hidden" id="acoesNoite">
       <button class="btn ghost" id="btnNoiteCopiar" type="button">Copiar resumo</button>
@@ -1390,19 +1395,25 @@
     $("cabecalhoRateio").classList.toggle("hidden", !mostrar);
     $("cardConsumo").classList.toggle("hidden", !mostrar);
     if(!mostrar) return;
+    desenharConsumoEm($("cardConsumo"), combinadas, despesas());
+  }
 
-    var caixa = $("cardConsumo");
+  function desenharConsumoEm(caixa, combinadas, lista){
+    var ids = {};
+    combinadas.forEach(function(x){ ids[x.id] = true; });
+    var existe = function(id){ return !!ids[id]; };
+
     caixa.innerHTML = "";
     combinadas.forEach(function(x){
-      if(!x.consumo && !despesas().some(function(d){ return participantesDe(d).indexOf(x.id) !== -1; })) return;
+      if(!x.consumo && !lista.some(function(d){ return participantesDe(d, existe).indexOf(x.id) !== -1; })) return;
 
       var row = el("div","result-row");
       row.appendChild(fichaDaLinha(x));
 
       var pagou = 0, deve = 0;
-      despesas().forEach(function(d){
+      lista.forEach(function(d){
         if(d.pagou === x.id) pagou += d.valor;
-        deve += quotaNaDespesa(d, x.id);
+        deve += quotaNaDespesa(d, x.id, existe);
       });
 
       var meio = el("div");
@@ -1694,7 +1705,8 @@
       Math.abs(dif) >= 0.005
         ? ("⚠ Atenção: a contagem das fichas não fechou (diferença de " + R(Math.abs(dif)) + ").")
         : null,
-      temConsumo() ? linhasCombinadas() : null
+      temConsumo() ? linhasCombinadas() : null,
+      despesas()
     );
   }
 
@@ -2365,10 +2377,13 @@
   }
 
   // Quem pagou sempre divide a própria compra.
-  function participantesDe(d){
+  // existe: diz se um id é de alguém daquela noite. Por padrão, da partida
+  // em andamento; numa noite arquivada, das linhas vindas do banco.
+  function participantesDe(d, existe){
+    existe = existe || function(id){ return !!jogador(id); };
     var lista = (d.participantes || []).slice();
     if(d.pagou && lista.indexOf(d.pagou) === -1) lista.push(d.pagou);
-    return lista.filter(function(id){ return jogador(id); });
+    return lista.filter(existe);
   }
 
   function despesas(){
@@ -2378,11 +2393,16 @@
 
   // Quem pagou fica credor do que adiantou; quem participou deve a sua cota.
   function calcularConsumo(){
-    var saldo = {}, total = 0;
-    S.jogadores.forEach(function(j){ saldo[j.id] = 0; });
+    return consumoDe(despesas(), S.jogadores.map(function(j){ return j.id; }));
+  }
 
-    despesas().forEach(function(d){
-      var quem = participantesDe(d).filter(function(id){ return saldo[id] !== undefined; });
+  function consumoDe(lista, ids){
+    var saldo = {}, total = 0;
+    ids.forEach(function(id){ saldo[id] = 0; });
+    var existe = function(id){ return saldo[id] !== undefined; };
+
+    lista.forEach(function(d){
+      var quem = participantesDe(d, existe);
       if(!quem.length || saldo[d.pagou] === undefined) return;
 
       total += d.valor;
@@ -2395,8 +2415,8 @@
     return { saldo: saldo, total: arredonda(total) };
   }
 
-  function quotaNaDespesa(d, jogadorId){
-    var quem = participantesDe(d);
+  function quotaNaDespesa(d, jogadorId, existe){
+    var quem = participantesDe(d, existe);
     var i = quem.indexOf(jogadorId);
     if(i === -1) return 0;
     return ratear(d.valor, quem.length)[i];
@@ -2405,8 +2425,12 @@
   // As linhas do poker, com o consumo somado. É só aqui que as duas contas
   // se juntam: o resultado do jogo continua intocado para o ranking.
   function linhasCombinadas(){
-    var consumo = calcularConsumo().saldo;
-    return linhasDaPartida().map(function(x){
+    return combinarComConsumo(linhasDaPartida(), despesas());
+  }
+
+  function combinarComConsumo(linhas, lista){
+    var consumo = consumoDe(lista, linhas.map(function(x){ return x.id; })).saldo;
+    return linhas.map(function(x){
       var c = consumo[x.id] || 0;
       return {
         id: x.id, nome: x.nome, pix: x.pix, cor: x.cor,
@@ -2643,8 +2667,9 @@
 
   // combinadas: quando a noite teve comes e bebes, é sobre elas que o acerto
   // é calculado — o bloco RESULTADO continua sendo só o do jogo.
-  function textoDoResumo(dataTxt, totalMesa, linhas, aviso, combinadas){
+  function textoDoResumo(dataTxt, totalMesa, linhas, aviso, combinadas, listaCompras){
     var paraAcerto = combinadas || linhas;
+    listaCompras = listaCompras || [];
     var porId = {};
     paraAcerto.forEach(function(x){ porId[x.id] = x; });
 
@@ -2662,9 +2687,10 @@
     if(combinadas){
       L.push("");
       L.push("COMES E BEBES");
-      despesas().forEach(function(d){
-        var quem = participantesDe(d);
-        L.push("• " + nomeDe(d.pagou) + " pagou " + R(d.valor) +
+      var existe = function(id){ return !!porId[id]; };
+      listaCompras.forEach(function(d){
+        var quem = participantesDe(d, existe);
+        L.push("• " + (porId[d.pagou] ? porId[d.pagou].nome : "?") + " pagou " + R(d.valor) +
                (d.oque ? " (" + d.oque + ")" : "") + " — rateado entre " + quem.length);
       });
       combinadas.forEach(function(x){
@@ -2701,13 +2727,23 @@
     $("subNoite").textContent = "Buscando os detalhes…";
     $("noiteResultados").innerHTML = "";
     $("noiteAcertos").innerHTML = "";
+    $("noiteConsumo").innerHTML = "";
+    $("cabNoiteConsumo").classList.add("hidden");
+    $("noiteConsumo").classList.add("hidden");
+    $("notaNoiteAcertos").classList.add("hidden");
     $("acoesNoite").classList.add("hidden");
     textoDaNoiteAberta = "";
     abrirDialogo($("dlgNoite"));
 
-    lerBanco("resultados?select=jogador_id,investido,credito,fichas_final,resultado,jogadores(nome,pix)" +
-             "&noite_id=eq." + n.id + "&order=resultado.desc")
-      .then(function(dados){
+    Promise.all([
+      lerBanco("resultados?select=jogador_id,investido,credito,fichas_final,resultado,jogadores(nome,pix)" +
+               "&noite_id=eq." + n.id + "&order=resultado.desc"),
+      // Banco ainda sem a coluna: a noite abre do mesmo jeito, só sem consumo.
+      lerBanco("noites?select=consumo&id=eq." + n.id).catch(function(){ return []; })
+    ])
+      .then(function(res){
+        var dados = res[0];
+        var consumoGuardado = (res[1] && res[1][0] && res[1][0].consumo) || null;
         var linhas = (dados || []).map(function(r, i){
           return {
             id: r.jogador_id,
@@ -2729,8 +2765,29 @@
         $("subNoite").textContent = R(n.total_mesa) + " em jogo · " +
           linhas.length + (linhas.length === 1 ? " jogador" : " jogadores");
         desenharResultados($("noiteResultados"), linhas);
-        desenharAcertos($("noiteAcertos"), linhas, null);
-        textoDaNoiteAberta = textoDoResumo(dataBR(n.data), n.total_mesa, linhas, null);
+
+        // As compras foram guardadas por nome; aqui viram ids das linhas.
+        var idPorNome = {};
+        linhas.forEach(function(x){ idPorNome[String(x.nome).toLowerCase()] = x.id; });
+        var porNome = function(nome){ return idPorNome[String(nome || "").toLowerCase()]; };
+        var compras = ((consumoGuardado && consumoGuardado.despesas) || []).map(function(d){
+          return {
+            pagou: porNome(d.pagou),
+            valor: Number(d.valor),
+            oque: d.oque || "",
+            participantes: (d.participantes || []).map(porNome).filter(function(id){ return id !== undefined; })
+          };
+        }).filter(function(d){ return d.pagou !== undefined && d.valor > 0; });
+
+        var combinadas = compras.length ? combinarComConsumo(linhas, compras) : null;
+        if(combinadas){
+          $("cabNoiteConsumo").classList.remove("hidden");
+          $("noiteConsumo").classList.remove("hidden");
+          $("notaNoiteAcertos").classList.remove("hidden");
+          desenharConsumoEm($("noiteConsumo"), combinadas, compras);
+        }
+        desenharAcertos($("noiteAcertos"), combinadas || linhas, null);
+        textoDaNoiteAberta = textoDoResumo(dataBR(n.data), n.total_mesa, linhas, null, combinadas, compras);
         $("acoesNoite").classList.remove("hidden");
       })
       .catch(function(e){ $("subNoite").textContent = erroLegivel(e); });
@@ -2771,6 +2828,22 @@
     if(aoConfirmarSenha) aoConfirmarSenha(senha);
   });
 
+  var consumoNaoGuardado = false, arquivoTeveConsumo = false;
+
+  function consumoParaArquivar(){
+    if(!temConsumo()) return null;
+    return {
+      despesas: despesas().map(function(d){
+        return {
+          pagou: nomeDe(d.pagou),
+          valor: d.valor,
+          oque: d.oque || "",
+          participantes: participantesDe(d).map(nomeDe)
+        };
+      })
+    };
+  }
+
   function arquivarNoite(forcar){
     var c = calcular();
     var dif = arredonda(somaFichasContadas() - c.totalMesa);
@@ -2780,6 +2853,21 @@
       return;
     }
     if(!S.jogadores.length){ avisarErro("Não há jogadores nesta partida."); return; }
+
+    if(!forcar && !arquivarNoite.conferido){
+      var linhasConf = linhasDaPartida().map(function(x){
+        return x.nome + ": terminou com " + R(x.fichas) + "  →  " + sinal(x.resultado);
+      });
+      confirmar("Confira antes de gravar",
+        "Noite de " + dataBR(dataDaNoite()) + "\n\n" + linhasConf.join("\n") +
+        "\n\nSe alguma ficha estiver no nome errado, corrija na contagem antes de gravar.",
+        "Gravar no ranking", false, function(){
+          arquivarNoite.conferido = true;
+          arquivarNoite(false);
+        });
+      return;
+    }
+    arquivarNoite.conferido = false;
 
     pedirSenha(function(senha){
       var btn = $("btnArquivar");
@@ -2812,12 +2900,26 @@
 
         var data = dataDaNoite();
 
-        return chamarBanco("arquivar_noite", {
+        var pedido = {
           p_senha: senha,
           p_data: data,
           p_total: c.totalMesa,
           p_resultados: resultados,
           p_forcar: !!forcar
+        };
+        var consumo = consumoParaArquivar();
+        arquivoTeveConsumo = !!consumo;
+        if(consumo) pedido.p_consumo = consumo;
+
+        return chamarBanco("arquivar_noite", pedido).catch(function(e){
+          // Banco ainda sem a coluna nova: grava o jogo assim mesmo, porque
+          // perder a noite inteira é pior do que perder só os comes e bebes.
+          if(consumo && e && /Could not find the function|p_consumo/i.test(e.message || "")){
+            delete pedido.p_consumo;
+            consumoNaoGuardado = true;
+            return chamarBanco("arquivar_noite", pedido);
+          }
+          throw e;
         });
       }).then(function(noiteId){
         guardarSenha(senha);
@@ -2846,9 +2948,15 @@
         render();
 
         mostrarTela("ranking");
-        confirmar("Noite arquivada \u2713",
-          "Os resultados entraram no ranking e a mesa ficou limpa para a pr\u00f3xima. " +
-          "Se ainda n\u00e3o mandou o acerto no grupo, d\u00e1 para copiar agora \u2014 ele j\u00e1 saiu desta tela.",
+        // Uma janela só: duas seguidas, a segunda cobriria o aviso.
+        var semConsumo = consumoNaoGuardado;
+        consumoNaoGuardado = false;
+        confirmar(semConsumo ? "Noite arquivada, sem os comes e bebes" : "Noite arquivada ✓",
+          semConsumo
+            ? "Os resultados do jogo entraram no ranking, mas os comes e bebes não puderam ser guardados: o banco ainda não foi atualizado. Copie o acerto agora — depois ele não estará mais disponível."
+            : (arquivoTeveConsumo
+                ? "Os resultados entraram no ranking e os comes e bebes ficaram guardados com a noite. A mesa ficou limpa para a próxima."
+                : "Os resultados entraram no ranking e a mesa ficou limpa para a próxima."),
           "Copiar o acerto", false, function(){
             copiar(acertoDaNoite, "Acerto copiado");
           });
@@ -2893,7 +3001,7 @@
      em paralelo sem que um deles descubra na hora.
      ===================================================================== */
   // Suba este número a cada publicação que mude o formato da mesa.
-  var VERSAO_APP = 20260925;
+  var VERSAO_APP = 20261003;
 
   function estadoMaisNovo(e){
     return !!(e && Number(e.versaoApp) > VERSAO_APP);

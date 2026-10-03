@@ -35,6 +35,13 @@ create table if not exists noites (
   criado_em   timestamptz not null default now()
 );
 
+-- Os comes e bebes da noite, guardados para reabrir o acerto depois.
+-- Ficam na noite, e não em "resultados", de propósito: as views do ranking
+-- só leem "resultados", então o consumo nunca entra na classificação.
+-- Formato: {"despesas":[{"pagou":"Nome","valor":75,"oque":"Cerveja",
+--                         "participantes":["Nome","Nome"]}]}
+alter table noites add column if not exists consumo jsonb;
+
 -- O resultado de cada jogador naquela noite. Guarda a conta aberta, e não
 -- só o saldo, para dar para conferir a noite depois.
 create table if not exists resultados (
@@ -141,12 +148,17 @@ $$;
 -- Arquiva uma noite inteira: a noite e o resultado de cada jogador.
 -- p_resultados é uma lista no formato:
 --   [{"jogador_id":1,"investido":100,"credito":50,"fichas_final":20,"resultado":-30}, ...]
+-- A assinatura mudou (ganhou p_consumo): a antiga precisa sair, senão as duas
+-- convivem e o servidor não sabe qual chamar.
+drop function if exists arquivar_noite(text, date, numeric, jsonb, boolean);
+
 create or replace function arquivar_noite(
   p_senha      text,
   p_data       date,
   p_total      numeric,
   p_resultados jsonb,
-  p_forcar     boolean default false
+  p_forcar     boolean default false,
+  p_consumo    jsonb   default null
 )
 returns bigint
 language plpgsql
@@ -181,7 +193,7 @@ begin
     raise exception 'NOITE_NAO_FECHA';
   end if;
 
-  insert into noites (data, total_mesa) values (p_data, p_total)
+  insert into noites (data, total_mesa, consumo) values (p_data, p_total, p_consumo)
   returning id into v_noite;
 
   for v_item in select * from jsonb_array_elements(p_resultados) loop
@@ -242,7 +254,7 @@ $$;
 
 grant execute on function apagar_jogador(text, bigint)                            to anon, authenticated;
 grant execute on function salvar_jogador(text, text, text)                        to anon, authenticated;
-grant execute on function arquivar_noite(text, date, numeric, jsonb, boolean)     to anon, authenticated;
+grant execute on function arquivar_noite(text, date, numeric, jsonb, boolean, jsonb) to anon, authenticated;
 grant execute on function apagar_noite(text, bigint)                              to anon, authenticated;
 
 
